@@ -48,14 +48,14 @@ const AppSidebar: React.FC = () => {
       aria-label="Administration sidebar"
     >
       <div
-        className={`flex h-20 items-center py-3 ${
-          showLabels ? "justify-start" : "justify-center"
+        className={`flex flex-col py-4 ${
+          showLabels ? "items-start" : "items-center"
         }`}
       >
         <Link
           href="/admin"
           className="flex items-center"
-          aria-label="Nigerian Society of Engineers — home"
+          aria-label="Nigerian Society of Engineers — Makurdi Branch"
         >
           {showLabels ? (
             <Image
@@ -80,6 +80,16 @@ const AppSidebar: React.FC = () => {
             />
           )}
         </Link>
+        {showLabels && (
+          <div className="mt-2">
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">
+              Makurdi Branch
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              2026 Branch Election
+            </p>
+          </div>
+        )}
       </div>
 
       <nav className="mt-4 flex-1 overflow-y-auto pb-6">
