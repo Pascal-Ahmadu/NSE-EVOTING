@@ -1,0 +1,148 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passcodeHash String
+  createdAt    DateTime @default(now())
+
+  @@map("admins")
+}
+
+model Voter {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  voterId      String   @unique
+  passwordHash String
+  registeredAt DateTime @default(now())
+
+  eligibilities VoterEligibility[]
+
+  @@map("voters")
+}
+
+/// One of: "draft" | "open" | "closed". Validated in the service layer.
+model Election {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  status      String    @default("draft")
+  createdAt   DateTime  @default(now())
+  openedAt    DateTime?
+  closedAt    DateTime?
+
+  positions     Position[]
+  ballots       Ballot[]
+  eligibilities VoterEligibility[]
+
+  @@map("elections")
+}
+
+model Position {
+  id          String   @id @default(cuid())
+  electionId  String
+  title       String
+  description String?
+  createdAt   DateTime @default(now())
+
+  election   Election    @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  candidates Candidate[]
+  choices    BallotChoice[]
+
+  @@index([electionId])
+  @@map("positions")
+}
+
+model Candidate {
+  id         String   @id @default(cuid())
+  positionId String
+  name       String
+  bio        String?
+  voterRef   String?
+  createdAt  DateTime @default(now())
+
+  position Position       @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  choices  BallotChoice[]
+
+  @@index([positionId])
+  @@map("candidates")
+}
+
+/// Anonymous ballot — intentionally NOT linked to the voter who cast it.
+/// One-vote-per-voter is enforced via VoterEligibility, not via this row.
+model Ballot {
+  id          String   @id @default(cuid())
+  electionId  String
+  /// Random opaque token issued at submission. Useful for receipts; not linkable
+  /// back to a voter through any other table.
+  ballotToken String   @unique
+  submittedAt DateTime @default(now())
+
+  election Election       @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  choices  BallotChoice[]
+
+  @@index([electionId])
+  @@map("ballots")
+}
+
+/// Tracks whether a registered voter has cast their ballot in an election.
+/// Holds NO link to the actual ballot they submitted, preserving secrecy.
+model VoterEligibility {
+  id         String   @id @default(cuid())
+  voterId    String
+  electionId String
+  votedAt    DateTime @default(now())
+
+  voter    Voter    @relation(fields: [voterId], references: [id], onDelete: Restrict)
+  election Election @relation(fields: [electionId], references: [id], onDelete: Cascade)
+
+  @@unique([electionId, voterId])
+  @@index([electionId])
+  @@index([voterId])
+  @@map("voter_eligibility")
+}
+
+/// Append-only audit trail of every state-changing admin action.
+model AuditLog {
+  id          String   @id @default(cuid())
+  adminId     String?
+  adminEmail  String?
+  action      String
+  targetType  String?
+  targetId    String?
+  details     String?
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([adminId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_log")
+}
+
+model BallotChoice {
+  id          String @id @default(cuid())
+  ballotId    String
+  positionId  String
+  candidateId String
+
+  ballot    Ballot    @relation(fields: [ballotId], references: [id], onDelete: Cascade)
+  position  Position  @relation(fields: [positionId], references: [id], onDelete: Restrict)
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+
+  @@unique([ballotId, positionId])
+  @@index([ballotId])
+  @@index([positionId])
+  @@index([candidateId])
+  @@map("ballot_choices")
+}

@@ -1,0 +1,156 @@
+import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
+import { db } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth-guards";
+import { requireSameOrigin } from "@/lib/csrf";
+import { audit, requestMeta } from "@/lib/audit";
+
+export async function GET(
+  _req: Request,
+  ctx: { params: Promise<{ id: string }> },
+) {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard.response;
+
+  const { id } = await ctx.params;
+  const election = await db.election.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      status: true,
+      createdAt: true,
+      openedAt: true,
+      closedAt: true,
+      positions: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          createdAt: true,
+          candidates: {
+            orderBy: { createdAt: "asc" },
+            select: {
+              id: true,
+              name: true,
+              bio: true,
+              voterRef: true,
+              createdAt: true,
+            },
+          },
+        },
+      },
+      _count: { select: { ballots: true } },
+    },
+  });
+  if (!election) {
+    return NextResponse.json({ error: "Election not found" }, { status: 404 });
+  }
+
+  const choiceCounts = await db.ballotChoice.groupBy({
+    by: ["positionId", "candidateId"],
+    where: { ballot: { electionId: id } },
+    _count: { _all: true },
+  });
+  const countByKey = new Map<string, number>();
+  for (const row of choiceCounts) {
+    countByKey.set(`${row.positionId}:${row.candidateId}`, row._count._all);
+  }
+
+  const tally = election.positions.map((position) => {
+    const results = position.candidates
+      .map((c) => ({
+        candidateId: c.id,
+        name: c.name,
+        votes: countByKey.get(`${position.id}:${c.id}`) ?? 0,
+      }))
+      .sort((a, b) => b.votes - a.votes);
+    return {
+      positionId: position.id,
+      results,
+      totalVotes: results.reduce((sum, r) => sum + r.votes, 0),
+    };
+  });
+
+  return NextResponse.json({
+    election: {
+      id: election.id,
+      name: election.name,
+      description: election.description,
+      status: election.status,
+      createdAt: election.createdAt.toISOString(),
+      openedAt: election.openedAt?.toISOString() ?? null,
+      closedAt: election.closedAt?.toISOString() ?? null,
+      ballotCount: election._count.ballots,
+      positions: election.positions.map((p) => ({
+        id: p.id,
+        title: p.title,
+        description: p.description,
+        candidates: p.candidates.map((c) => ({
+          id: c.id,
+          name: c.name,
+          bio: c.bio,
+          voterRef: c.voterRef,
+        })),
+      })),
+      tally,
+    },
+  });
+}
+
+export async function DELETE(
+  req: Request,
+  ctx: { params: Promise<{ id: string }> },
+) {
+  const csrf = requireSameOrigin(req);
+  if (csrf) return csrf;
+
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard.response;
+
+  const { id } = await ctx.params;
+  const election = await db.election.findUnique({
+    where: { id },
+    select: { name: true, _count: { select: { ballots: true } } },
+  });
+  if (!election) {
+    return NextResponse.json({ error: "Election not found" }, { status: 404 });
+  }
+  if (election._count.ballots > 0) {
+    return NextResponse.json(
+      { error: "Cannot delete an election that has received ballots" },
+      { status: 409 },
+    );
+  }
+  try {
+    await db.election.delete({ where: { id } });
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2025"
+    ) {
+      return NextResponse.json({ error: "Election not found" }, { status: 404 });
+    }
+    throw err;
+  }
+
+  const admin = await db.admin.findUnique({
+    where: { id: guard.value.adminId },
+    select: { email: true },
+  });
+  const meta = requestMeta(req);
+  await audit({
+    adminId: guard.value.adminId,
+    adminEmail: admin?.email ?? null,
+    action: "election.delete",
+    targetType: "election",
+    targetId: id,
+    details: { name: election.name },
+    ip: meta.ip,
+    userAgent: meta.userAgent,
+  });
+
+  return NextResponse.json({ ok: true });
+}
