@@ -41,7 +41,7 @@ yarn-error.log*
 .env.test.local
 .env*.local
 
-# local sqlite database
+# local sqlite (no longer used; kept ignored for safety)
 prisma/dev.db
 prisma/dev.db-journal
 prisma/dev.db-shm
