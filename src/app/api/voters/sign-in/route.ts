@@ -9,11 +9,11 @@ import {
   clientIp,
   rateLimitResponse,
 } from "@/lib/rate-limit";
-import { Email, parseJson } from "@/lib/zod-helpers";
+import { VoterIdInput, parseJson } from "@/lib/zod-helpers";
 import { log } from "@/lib/logger";
 
 const Body = z.object({
-  email: Email,
+  voterId: VoterIdInput,
   password: z.string().min(1, "Password is required").max(64),
 });
 
@@ -31,22 +31,22 @@ export async function POST(req: Request) {
 
   const parsed = await parseJson(req, Body);
   if (!parsed.ok) return parsed.response;
-  const { email, password } = parsed.data;
+  const { voterId, password } = parsed.data;
 
-  const emailLimit = checkRateLimit({
-    key: `voter-signin:email:${email}`,
+  const idLimit = checkRateLimit({
+    key: `voter-signin:id:${voterId}`,
     limit: 5,
     windowMs: 5 * 60_000,
   });
-  if (!emailLimit.ok) return rateLimitResponse(emailLimit.retryAfterSec);
+  if (!idLimit.ok) return rateLimitResponse(idLimit.retryAfterSec);
 
-  const voter = await db.voter.findUnique({ where: { email } });
+  const voter = await db.voter.findUnique({ where: { voterId } });
   if (!voter || !(await verifySecret(password, voter.passwordHash))) {
-    log.warn("voter_signin_failed", { email, ip });
+    log.warn("voter_signin_failed", { voterId, ip });
     return NextResponse.json(
       {
         error:
-          "We couldn't sign you in. Check your email and password — or contact your election administrator.",
+          "We couldn't sign you in. Check your NSE number and password — or contact your election administrator.",
       },
       { status: 401 },
     );

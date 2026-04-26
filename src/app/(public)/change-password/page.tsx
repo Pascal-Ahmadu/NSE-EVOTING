@@ -8,18 +8,17 @@ import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import { ChevronLeftIcon } from "@/icons";
 import { apiCall } from "@/lib/api-client";
-import { validateEmail, validatePassword } from "@/lib/validators";
+import { validatePassword, validateVoterId } from "@/lib/validators";
 
 interface FormState {
-  email: string;
+  voterId: string;
   currentPassword: string;
   newPassword: string;
   confirmPassword: string;
 }
 
-
 interface FieldErrors {
-  email?: string;
+  voterId?: string;
   currentPassword?: string;
   newPassword?: string;
   confirmPassword?: string;
@@ -27,7 +26,7 @@ interface FieldErrors {
 }
 
 const EMPTY_FORM: FormState = {
-  email: "",
+  voterId: "",
   currentPassword: "",
   newPassword: "",
   confirmPassword: "",
@@ -50,7 +49,7 @@ export default function ChangePasswordPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const next: FieldErrors = {
-      email: validateEmail(form.email) ?? undefined,
+      voterId: validateVoterId(form.voterId) ?? undefined,
       currentPassword: form.currentPassword
         ? undefined
         : "Current password is required",
@@ -61,7 +60,7 @@ export default function ChangePasswordPage() {
           : undefined,
     };
     if (
-      next.email ||
+      next.voterId ||
       next.currentPassword ||
       next.newPassword ||
       next.confirmPassword
@@ -73,7 +72,7 @@ export default function ChangePasswordPage() {
     const result = await apiCall<{ ok: true }>("/api/voters/change-password", {
       method: "POST",
       body: JSON.stringify({
-        email: form.email,
+        voterId: form.voterId,
         currentPassword: form.currentPassword,
         newPassword: form.newPassword,
       }),
@@ -111,22 +110,22 @@ export default function ChangePasswordPage() {
             )}
 
             <div>
-              <Label htmlFor="email" className="text-base">
-                Email address
+              <Label htmlFor="voter-id" className="text-base">
+                NSE Number
               </Label>
               <Input
-                id="email"
-                type="email"
+                id="voter-id"
+                type="text"
                 size="lg"
-                value={form.email}
-                onChange={(e) => setField("email", e.target.value)}
-                placeholder="you@example.com"
-                autoComplete="email"
-                inputMode="email"
-                maxLength={254}
+                value={form.voterId}
+                onChange={(e) => setField("voterId", e.target.value)}
+                placeholder="e.g. NSE-1234"
+                autoComplete="username"
+                autoCapitalize="characters"
+                maxLength={32}
                 required
-                error={Boolean(errors.email)}
-                hint={errors.email}
+                error={Boolean(errors.voterId)}
+                hint={errors.voterId}
               />
             </div>
 

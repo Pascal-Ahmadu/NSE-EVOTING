@@ -8,11 +8,11 @@ import {
   clientIp,
   rateLimitResponse,
 } from "@/lib/rate-limit";
-import { Email, parseJson } from "@/lib/zod-helpers";
+import { VoterIdInput, parseJson } from "@/lib/zod-helpers";
 
 const Body = z
   .object({
-    email: Email,
+    voterId: VoterIdInput,
     currentPassword: z.string().min(1, "Current password is required"),
     newPassword: z.string().min(4, "New password must be at least 4 characters").max(64),
   })
@@ -35,12 +35,12 @@ export async function POST(req: Request) {
 
   const parsed = await parseJson(req, Body);
   if (!parsed.ok) return parsed.response;
-  const { email, currentPassword, newPassword } = parsed.data;
+  const { voterId, currentPassword, newPassword } = parsed.data;
 
-  const voter = await db.voter.findUnique({ where: { email } });
+  const voter = await db.voter.findUnique({ where: { voterId } });
   if (!voter || !(await verifySecret(currentPassword, voter.passwordHash))) {
     return NextResponse.json(
-      { error: "Email or current password is incorrect" },
+      { error: "NSE number or current password is incorrect" },
       { status: 401 },
     );
   }

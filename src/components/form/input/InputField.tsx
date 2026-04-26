@@ -10,6 +10,7 @@ interface InputProps {
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
   autoComplete?: string;
+  autoCapitalize?: "off" | "none" | "on" | "sentences" | "words" | "characters";
   inputMode?: "text" | "email" | "numeric" | "decimal" | "search" | "tel" | "url" | "none";
   maxLength?: number;
   required?: boolean;
@@ -35,6 +36,7 @@ const Input: FC<InputProps> = ({
   onChange,
   onBlur,
   autoComplete,
+  autoCapitalize,
   inputMode,
   maxLength,
   required,
@@ -86,6 +88,7 @@ const Input: FC<InputProps> = ({
         onChange={onChange}
         onBlur={onBlur}
         autoComplete={autoComplete}
+        autoCapitalize={autoCapitalize}
         inputMode={inputMode}
         maxLength={maxLength}
         required={required}

@@ -8,18 +8,18 @@ import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import { ChevronRightIcon } from "@/icons";
-import { validateEmail, validatePassword } from "@/lib/validators";
+import { validatePassword, validateVoterId } from "@/lib/validators";
 import { apiCall } from "@/lib/api-client";
 
 interface FieldErrors {
-  email?: string;
+  voterId?: string;
   password?: string;
   form?: string;
 }
 
 export default function VoterSignInPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [voterId, setVoterId] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
@@ -27,17 +27,17 @@ export default function VoterSignInPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const next: FieldErrors = {
-      email: validateEmail(email) ?? undefined,
+      voterId: validateVoterId(voterId) ?? undefined,
       password: validatePassword(password) ?? undefined,
     };
-    if (next.email || next.password) {
+    if (next.voterId || next.password) {
       setErrors(next);
       return;
     }
     setSubmitting(true);
     const result = await apiCall<{ voter: unknown }>("/api/voters/sign-in", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ voterId, password }),
     });
     if (!result.ok) {
       setErrors({ form: result.error });
@@ -58,11 +58,17 @@ export default function VoterSignInPage() {
           priority
           className="h-14 w-auto dark:brightness-0 dark:invert"
         />
-        <h1 className="mt-6 text-3xl font-semibold text-gray-900 dark:text-white">
+        <p className="mt-3 text-base font-semibold text-gray-900 dark:text-white">
+          Makurdi Branch
+        </p>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          2026 Branch Election
+        </p>
+        <h1 className="mt-7 text-3xl font-semibold text-gray-900 dark:text-white">
           Sign in to vote
         </h1>
         <p className="mt-2 max-w-xs text-base text-gray-500 dark:text-gray-400">
-          Enter the email and password your election administrator gave you.
+          Use your NSE number and the password sent by the administrator.
         </p>
       </div>
 
@@ -77,25 +83,25 @@ export default function VoterSignInPage() {
             </div>
           )}
           <div>
-            <Label htmlFor="email" className="text-base">
-              Email address
+            <Label htmlFor="voter-id" className="text-base">
+              NSE Number
             </Label>
             <Input
-              id="email"
-              type="email"
+              id="voter-id"
+              type="text"
               size="lg"
-              placeholder="you@example.com"
-              value={email}
+              placeholder="e.g. NSE-1234"
+              value={voterId}
               onChange={(e) => {
-                setEmail(e.target.value);
-                if (errors.email) setErrors((p) => ({ ...p, email: undefined }));
+                setVoterId(e.target.value);
+                if (errors.voterId) setErrors((p) => ({ ...p, voterId: undefined }));
               }}
-              autoComplete="email"
-              inputMode="email"
-              maxLength={254}
+              autoComplete="username"
+              autoCapitalize="characters"
+              maxLength={32}
               required
-              error={Boolean(errors.email)}
-              hint={errors.email}
+              error={Boolean(errors.voterId)}
+              hint={errors.voterId}
             />
           </div>
 
@@ -107,7 +113,7 @@ export default function VoterSignInPage() {
               id="password"
               type="password"
               size="lg"
-              placeholder="Enter your password"
+              placeholder="Password sent by administrator"
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);

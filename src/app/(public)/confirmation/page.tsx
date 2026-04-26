@@ -28,7 +28,7 @@ function ConfirmationContent() {
     status === "already" ? "You have already voted" : "Your ballot is in";
   const message =
     status === "already"
-      ? "Our records show this voter ID has already submitted a ballot for this election. Each voter may submit one ballot only."
+      ? "Our records show this NSE number has already submitted a ballot for this election. Each voter may submit one ballot only."
       : "Thank you for voting. Your selections have been recorded. You may now close this window.";
 
   return (

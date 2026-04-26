@@ -168,7 +168,7 @@ export default function VotersPage() {
   };
 
   const handleCopyCredentials = async (voter: VoterCredentials) => {
-    const text = `Sign-in credentials\nName: ${voter.name}\nEmail: ${voter.email}\nVoter ID: ${voter.voterId}\nPassword: ${voter.password}`;
+    const text = `Sign-in credentials\nName: ${voter.name}\nEmail: ${voter.email}\nNSE Number: ${voter.voterId}\nPassword: ${voter.password}`;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -253,7 +253,7 @@ export default function VotersPage() {
             <Input
               id="voter-filter"
               type="text"
-              placeholder="Search by name, email or voter ID"
+              placeholder="Search by name, email or NSE number"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               maxLength={64}
@@ -265,7 +265,7 @@ export default function VotersPage() {
                 <tr>
                   <th className="px-4 py-3 font-medium">Name</th>
                   <th className="px-4 py-3 font-medium">Email</th>
-                  <th className="px-4 py-3 font-medium">Voter ID</th>
+                  <th className="px-4 py-3 font-medium">NSE Number</th>
                   <th className="px-4 py-3 font-medium">Registered</th>
                   <th className="px-4 py-3 font-medium">Ballots</th>
                   <th className="px-4 py-3" />
@@ -389,7 +389,7 @@ export default function VotersPage() {
               </div>
               <div>
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="new-voter-id">Voter ID</Label>
+                  <Label htmlFor="new-voter-id">NSE Number</Label>
                   <button
                     type="button"
                     onClick={handleAutoGenerateId}
@@ -474,7 +474,7 @@ export default function VotersPage() {
             <dl className="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm dark:border-gray-800 dark:bg-gray-800/40">
               <Row label="Name" value={view.voter.name} />
               <Row label="Email" value={view.voter.email} />
-              <Row label="Voter ID" value={view.voter.voterId} mono />
+              <Row label="NSE Number" value={view.voter.voterId} mono />
               <Row label="Password" value={view.voter.password} mono />
             </dl>
 
