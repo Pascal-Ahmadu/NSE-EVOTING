@@ -8,7 +8,7 @@ interface AdminSessionData {
 const SESSION_COOKIE = "evoting_admin_session";
 const PUBLIC_ADMIN_PATHS = ["/admin/sign-in", "/admin/change-password"];
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Only guard /admin/* page navigations.
