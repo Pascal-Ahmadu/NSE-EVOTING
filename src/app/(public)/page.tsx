@@ -138,14 +138,6 @@ export default function VoterSignInPage() {
           </Button>
         </form>
 
-        <div className="mt-5 text-right">
-          <Link
-            href="/change-password"
-            className="text-sm font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400"
-          >
-            Change my password
-          </Link>
-        </div>
       </div>
 
       <div className="mt-6 flex flex-col items-center gap-3">
