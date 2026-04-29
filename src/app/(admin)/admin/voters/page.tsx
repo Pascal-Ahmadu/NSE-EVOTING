@@ -75,6 +75,8 @@ export default function VotersPage() {
   const [form, setForm] = useState<VoterForm>(EMPTY_FORM);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [confirm, setConfirm] = useState<VoterRow | null>(null);
+  const [resetConfirm, setResetConfirm] = useState<VoterRow | null>(null);
+  const [resetting, setResetting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -190,6 +192,20 @@ export default function VotersPage() {
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!resetConfirm) return;
+    setResetting(true);
+    const result = await apiCall<{ voter: VoterCredentials }>(
+      `/api/voters/${resetConfirm.id}/reset-password`,
+      { method: "POST" },
+    );
+    setResetting(false);
+    setResetConfirm(null);
+    if (result.ok) {
+      setView({ kind: "success", voter: result.data.voter });
+    }
+  };
+
   const setField = <K extends keyof VoterForm>(key: K, value: VoterForm[K]) => {
     setForm((p) => ({ ...p, [key]: value }));
     if (errors[key] || errors.form) setErrors({});
@@ -292,15 +308,25 @@ export default function VotersPage() {
                       <td className="px-4 py-3">{formatDate(voter.registeredAt)}</td>
                       <td className="px-4 py-3">{voter.ballotCount}</td>
                       <td className="px-4 py-3 text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          ariaLabel={`Remove voter ${voter.name}`}
-                          startIcon={<TrashBinIcon />}
-                          onClick={() => setConfirm(voter)}
-                        >
-                          Remove
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            ariaLabel={`Reset password for ${voter.name}`}
+                            onClick={() => setResetConfirm(voter)}
+                          >
+                            Reset password
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            ariaLabel={`Remove voter ${voter.name}`}
+                            startIcon={<TrashBinIcon />}
+                            onClick={() => setConfirm(voter)}
+                          >
+                            Remove
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -522,6 +548,33 @@ export default function VotersPage() {
           </Button>
           <Button variant="danger" size="sm" onClick={handleDelete}>
             Remove
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={resetConfirm !== null}
+        onClose={() => setResetConfirm(null)}
+        className="m-4 max-w-md p-6"
+      >
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          Reset password
+        </h3>
+        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          {resetConfirm
+            ? `Generate a new password for ${resetConfirm.name} (${resetConfirm.voterId})? Their current password will stop working immediately. The new password is shown only once — copy and share it through your usual channel.`
+            : ""}
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setResetConfirm(null)}
+          >
+            Cancel
+          </Button>
+          <Button size="sm" onClick={handleResetPassword} loading={resetting}>
+            {resetting ? "Generating…" : "Generate new password"}
           </Button>
         </div>
       </Modal>
