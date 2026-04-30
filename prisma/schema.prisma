@@ -114,18 +114,32 @@ model VoterEligibility {
 
 /// Append-only audit trail of every state-changing admin action.
 model AuditLog {
-  id          String   @id @default(cuid())
-  adminId     String?
-  adminEmail  String?
-  action      String
-  targetType  String?
-  targetId    String?
-  details     String?
-  ip          String?
-  userAgent   String?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  /// "admin" | "voter" | null (anonymous events, e.g. failed sign-in)
+  actorType  String?
+  actorId    String?
+  actorLabel String?
+  action     String
+  targetType String?
+  targetId   String?
+  details    String?
+  ip         String?
+  userAgent  String?
+  /// User-Agent parsed once at write time so the audit page can filter without
+  /// re-parsing on every render.
+  browser    String?
+  os         String?
+  deviceType String?
+  /// Vercel-injected geo (best-effort; null in local dev or self-hosted).
+  city      String?
+  region    String?
+  country   String?
+  latitude  Float?
+  longitude Float?
+  createdAt DateTime @default(now())
 
-  @@index([adminId])
+  @@index([actorId])
+  @@index([actorType])
   @@index([action])
   @@index([createdAt])
   @@map("audit_log")

@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { requireVoter } from "@/lib/auth-guards";
 import { requireSameOrigin } from "@/lib/csrf";
 import { parseJson } from "@/lib/zod-helpers";
+import { audit, requestMeta } from "@/lib/audit";
 
 const BodySchema = z.object({
   electionId: z.string().min(1),
@@ -125,6 +126,24 @@ export async function POST(req: Request) {
     }
     throw err;
   }
+
+  // Audit only the FACT of submission (voter + election + receipt token).
+  // We deliberately do NOT log the choices — that would re-introduce the
+  // voter→ballot link the schema is designed to break.
+  const voter = await db.voter.findUnique({
+    where: { id: voterId },
+    select: { voterId: true },
+  });
+  await audit({
+    actorType: "voter",
+    actorId: voterId,
+    actorLabel: voter?.voterId ?? null,
+    action: "ballot.submit",
+    targetType: "election",
+    targetId: electionId,
+    details: { receipt: ballotToken },
+    meta: requestMeta(req),
+  });
 
   return NextResponse.json({ ok: true, receipt: ballotToken }, { status: 201 });
 }

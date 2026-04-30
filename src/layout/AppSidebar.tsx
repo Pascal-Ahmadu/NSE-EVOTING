@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
 import {
   BoxIconLine,
+  DocsIcon,
   GridIcon,
   GroupIcon,
   PieChartIcon,
@@ -30,6 +31,7 @@ const navItems: NavItem[] = [
   { name: "Voters", path: "/admin/voters", icon: <GroupIcon /> },
   { name: "Results", path: "/admin/results", icon: <PieChartIcon /> },
   { name: "Admins", path: "/admin/admins", icon: <UserCircleIcon /> },
+  { name: "Audit log", path: "/admin/audit", icon: <DocsIcon /> },
 ];
 
 const AppSidebar: React.FC = () => {

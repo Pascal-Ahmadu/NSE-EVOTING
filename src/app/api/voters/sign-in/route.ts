@@ -10,6 +10,7 @@ import {
   rateLimitResponse,
 } from "@/lib/rate-limit";
 import { VoterIdInput, parseJson } from "@/lib/zod-helpers";
+import { audit, requestMeta } from "@/lib/audit";
 import { log } from "@/lib/logger";
 
 const Body = z.object({
@@ -40,9 +41,17 @@ export async function POST(req: Request) {
   });
   if (!idLimit.ok) return rateLimitResponse(idLimit.retryAfterSec);
 
+  const meta = requestMeta(req);
   const voter = await db.voter.findUnique({ where: { voterId } });
   if (!voter || !(await verifySecret(password, voter.passwordHash))) {
     log.warn("voter_signin_failed", { voterId, ip });
+    await audit({
+      actorType: "voter",
+      actorId: null,
+      actorLabel: voterId,
+      action: "voter.signin.failed",
+      meta,
+    });
     return NextResponse.json(
       {
         error:
@@ -55,6 +64,14 @@ export async function POST(req: Request) {
   const session = await getVoterSession();
   session.voterId = voter.id;
   await session.save();
+
+  await audit({
+    actorType: "voter",
+    actorId: voter.id,
+    actorLabel: voter.voterId,
+    action: "voter.signin",
+    meta,
+  });
 
   return NextResponse.json({
     voter: {

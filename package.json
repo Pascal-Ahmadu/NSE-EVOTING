@@ -42,6 +42,7 @@
     "react-dropzone": "^14.3.8",
     "swiper": "^11.2.10",
     "tailwind-merge": "^2.6.0",
+    "ua-parser-js": "^2.0.9",
     "zod": "^4.3.6"
   },
   "devDependencies": {

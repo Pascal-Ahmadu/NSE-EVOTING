@@ -41,16 +41,16 @@ export async function POST(req: Request) {
   });
   if (!emailLimit.ok) return rateLimitResponse(emailLimit.retryAfterSec);
 
+  const meta = requestMeta(req);
   const admin = await db.admin.findUnique({ where: { email } });
   if (!admin || !(await verifySecret(passcode, admin.passcodeHash))) {
     log.warn("admin_signin_failed", { email, ip });
-    const meta = requestMeta(req);
     await audit({
-      adminId: null,
-      adminEmail: email,
+      actorType: "admin",
+      actorId: null,
+      actorLabel: email,
       action: "admin.signin.failed",
-      ip: meta.ip,
-      userAgent: meta.userAgent,
+      meta,
     });
     return NextResponse.json(
       { error: "Email or passcode is incorrect" },
@@ -62,13 +62,12 @@ export async function POST(req: Request) {
   session.adminId = admin.id;
   await session.save();
 
-  const meta = requestMeta(req);
   await audit({
-    adminId: admin.id,
-    adminEmail: admin.email,
+    actorType: "admin",
+    actorId: admin.id,
+    actorLabel: admin.email,
     action: "admin.signin",
-    ip: meta.ip,
-    userAgent: meta.userAgent,
+    meta,
   });
 
   return NextResponse.json({
