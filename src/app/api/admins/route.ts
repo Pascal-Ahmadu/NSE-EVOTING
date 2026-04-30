@@ -7,6 +7,7 @@ import { requireAdmin } from "@/lib/auth-guards";
 import { requireSameOrigin } from "@/lib/csrf";
 import { audit, requestMeta } from "@/lib/audit";
 import { Email, Name, parseJson } from "@/lib/zod-helpers";
+import { getRevokedIds } from "@/lib/revocation";
 
 const Body = z.object({
   name: Name,
@@ -18,7 +19,9 @@ export async function GET() {
   const guard = await requireAdmin();
   if (!guard.ok) return guard.response;
 
+  const revokedIds = await getRevokedIds("admin");
   const admins = await db.admin.findMany({
+    where: revokedIds.length > 0 ? { id: { notIn: revokedIds } } : undefined,
     orderBy: { createdAt: "asc" },
     select: { id: true, name: true, email: true, createdAt: true },
   });

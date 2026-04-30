@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { hashSecret } from "@/lib/password";
+import { rotateVoterPassword } from "@/lib/credentials";
+import { isRevoked } from "@/lib/revocation";
 import { requireAdmin } from "@/lib/auth-guards";
 import { requireSameOrigin } from "@/lib/csrf";
 import { audit, requestMeta } from "@/lib/audit";
@@ -28,31 +28,27 @@ export async function POST(
   if (!guard.ok) return guard.response;
 
   const { id } = await ctx.params;
-  const password = generatePassword();
-  const passwordHash = await hashSecret(password);
-
-  let voter;
-  try {
-    voter = await db.voter.update({
-      where: { id },
-      data: { passwordHash },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        voterId: true,
-        registeredAt: true,
-      },
-    });
-  } catch (err) {
-    if (
-      err instanceof Prisma.PrismaClientKnownRequestError &&
-      err.code === "P2025"
-    ) {
-      return NextResponse.json({ error: "Voter not found" }, { status: 404 });
-    }
-    throw err;
+  const voter = await db.voter.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      voterId: true,
+      registeredAt: true,
+    },
+  });
+  if (!voter) {
+    return NextResponse.json({ error: "Voter not found" }, { status: 404 });
   }
+  if (await isRevoked("voter", voter.id)) {
+    return NextResponse.json(
+      { error: "Voter has been removed" },
+      { status: 410 },
+    );
+  }
+  const password = generatePassword();
+  await rotateVoterPassword(voter.id, password);
 
   const admin = await db.admin.findUnique({
     where: { id: guard.value.adminId },

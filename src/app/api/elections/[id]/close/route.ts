@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-guards";
 import { requireSameOrigin } from "@/lib/csrf";
 import { audit, requestMeta } from "@/lib/audit";
+import { isRevoked } from "@/lib/revocation";
+import { getElectionState, transitionElection } from "@/lib/election-state";
 
 export async function POST(
   req: Request,
@@ -15,38 +17,42 @@ export async function POST(
   if (!guard.ok) return guard.response;
 
   const { id } = await ctx.params;
+  if (await isRevoked("election", id)) {
+    return NextResponse.json({ error: "Election not found" }, { status: 404 });
+  }
   const election = await db.election.findUnique({
     where: { id },
-    select: { name: true, status: true },
+    select: { name: true },
   });
   if (!election) {
     return NextResponse.json({ error: "Election not found" }, { status: 404 });
   }
-  if (election.status !== "open") {
+  const state = await getElectionState(id);
+  if (state.status !== "open") {
     return NextResponse.json(
       { error: "Only open elections can be closed" },
       { status: 409 },
     );
   }
-  await db.election.update({
-    where: { id },
-    data: { status: "closed", closedAt: new Date() },
+  await transitionElection({
+    electionId: id,
+    status: "closed",
+    changedByAdminId: guard.value.adminId,
   });
 
   const admin = await db.admin.findUnique({
     where: { id: guard.value.adminId },
     select: { email: true },
   });
-  const meta = requestMeta(req);
   await audit({
-    adminId: guard.value.adminId,
-    adminEmail: admin?.email ?? null,
+    actorType: "admin",
+    actorId: guard.value.adminId,
+    actorLabel: admin?.email ?? null,
     action: "election.close",
     targetType: "election",
     targetId: id,
     details: { name: election.name },
-    ip: meta.ip,
-    userAgent: meta.userAgent,
+    meta: requestMeta(req),
   });
 
   return NextResponse.json({ ok: true });

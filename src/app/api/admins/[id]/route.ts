@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-guards";
 import { requireSameOrigin } from "@/lib/csrf";
 import { audit, requestMeta } from "@/lib/audit";
+import { getRevokedIds, isRevoked, revoke } from "@/lib/revocation";
 
 export async function DELETE(
   req: Request,
@@ -25,7 +25,9 @@ export async function DELETE(
   }
 
   const total = await db.admin.count();
-  if (total <= 1) {
+  const revokedAdminIds = await getRevokedIds("admin");
+  const active = total - revokedAdminIds.length;
+  if (active <= 1) {
     return NextResponse.json(
       { error: "Cannot remove the last admin" },
       { status: 409 },
@@ -36,18 +38,21 @@ export async function DELETE(
     where: { id },
     select: { email: true },
   });
-
-  try {
-    await db.admin.delete({ where: { id } });
-  } catch (err) {
-    if (
-      err instanceof Prisma.PrismaClientKnownRequestError &&
-      err.code === "P2025"
-    ) {
-      return NextResponse.json({ error: "Admin not found" }, { status: 404 });
-    }
-    throw err;
+  if (!target) {
+    return NextResponse.json({ error: "Admin not found" }, { status: 404 });
   }
+  if (await isRevoked("admin", id)) {
+    return NextResponse.json(
+      { error: "Admin is already removed" },
+      { status: 409 },
+    );
+  }
+  // INSERT revocation row (no DELETE) — physical record persists for audit.
+  await revoke({
+    targetType: "admin",
+    targetId: id,
+    revokedByAdminId: currentAdminId,
+  });
 
   const actor = await db.admin.findUnique({
     where: { id: currentAdminId },

@@ -12,10 +12,29 @@ model Admin {
   id           String   @id @default(cuid())
   name         String
   email        String   @unique
+  /// Initial seeded passcode. After the first credential rotation this column
+  /// is no longer authoritative — the latest AdminCredential row is.
   passcodeHash String
   createdAt    DateTime @default(now())
 
+  credentials AdminCredential[]
+
   @@map("admins")
+}
+
+/// Append-only credential history for an admin. The row with the latest
+/// createdAt is the active passcode; older rows are immutable evidence of
+/// past credentials.
+model AdminCredential {
+  id           String   @id @default(cuid())
+  adminId      String
+  passcodeHash String
+  createdAt    DateTime @default(now())
+
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@map("admin_credentials")
 }
 
 model Voter {
@@ -27,8 +46,22 @@ model Voter {
   registeredAt DateTime @default(now())
 
   eligibilities VoterEligibility[]
+  credentials   VoterCredential[]
 
   @@map("voters")
+}
+
+/// Append-only credential history for a voter. Latest row is active.
+model VoterCredential {
+  id           String   @id @default(cuid())
+  voterId      String
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  voter Voter @relation(fields: [voterId], references: [id], onDelete: Cascade)
+
+  @@index([voterId])
+  @@map("voter_credentials")
 }
 
 /// One of: "draft" | "open" | "closed". Validated in the service layer.
@@ -44,8 +77,41 @@ model Election {
   positions     Position[]
   ballots       Ballot[]
   eligibilities VoterEligibility[]
+  statusEvents  ElectionStatusEvent[]
 
   @@map("elections")
+}
+
+/// Append-only log of every status transition (draft / open / closed). The
+/// latest row supersedes older ones; the `status` / `openedAt` / `closedAt`
+/// columns on Election are seed values only and are no longer mutated.
+model ElectionStatusEvent {
+  id               String   @id @default(cuid())
+  electionId       String
+  status           String
+  changedByAdminId String?
+  createdAt        DateTime @default(now())
+
+  election Election @relation(fields: [electionId], references: [id], onDelete: Cascade)
+
+  @@index([electionId])
+  @@map("election_status_events")
+}
+
+/// Soft-delete record. Inserting a row marks the target as revoked. Deletion
+/// itself is forbidden — admins cannot UN-delete by simply removing this row.
+model Revocation {
+  id               String   @id @default(cuid())
+  /// "admin" | "voter" | "election" | "position" | "candidate"
+  targetType       String
+  targetId         String
+  reason           String?
+  revokedByAdminId String?
+  createdAt        DateTime @default(now())
+
+  @@unique([targetType, targetId])
+  @@index([targetType])
+  @@map("revocations")
 }
 
 model Position {

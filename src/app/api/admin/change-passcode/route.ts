@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { hashSecret, verifySecret } from "@/lib/password";
+import { verifySecret } from "@/lib/password";
+import {
+  getActiveAdminPasscodeHash,
+  rotateAdminPasscode,
+} from "@/lib/credentials";
+import { isRevoked } from "@/lib/revocation";
 import { requireSameOrigin } from "@/lib/csrf";
 import {
   checkRateLimit,
@@ -39,17 +44,16 @@ export async function POST(req: Request) {
   const { email, currentPasscode, newPasscode } = parsed.data;
 
   const admin = await db.admin.findUnique({ where: { email } });
-  if (!admin || !(await verifySecret(currentPasscode, admin.passcodeHash))) {
+  const revoked = admin ? await isRevoked("admin", admin.id) : false;
+  const activeHash = admin && !revoked ? await getActiveAdminPasscodeHash(admin.id) : null;
+  if (!admin || revoked || !activeHash || !(await verifySecret(currentPasscode, activeHash))) {
     return NextResponse.json(
       { error: "Email or current passcode is incorrect" },
       { status: 401 },
     );
   }
 
-  await db.admin.update({
-    where: { id: admin.id },
-    data: { passcodeHash: await hashSecret(newPasscode) },
-  });
+  await rotateAdminPasscode(admin.id, newPasscode);
 
   const meta = requestMeta(req);
   await audit({

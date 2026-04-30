@@ -8,6 +8,7 @@ import { requireSameOrigin } from "@/lib/csrf";
 import { audit, requestMeta } from "@/lib/audit";
 import { buildPage, parsePageParams } from "@/lib/pagination";
 import { Email, Name, Password, VoterIdInput, parseJson } from "@/lib/zod-helpers";
+import { getRevokedIds } from "@/lib/revocation";
 
 const CreateBody = z.object({
   name: Name,
@@ -33,15 +34,19 @@ export async function GET(req: Request) {
   const params = parsePageParams(url.searchParams);
   const q = url.searchParams.get("q")?.trim() ?? "";
 
-  const where: Prisma.VoterWhereInput = q
-    ? {
-        OR: [
-          { name: { contains: q } },
-          { email: { contains: q } },
-          { voterId: { contains: q } },
-        ],
-      }
-    : {};
+  const revokedIds = await getRevokedIds("voter");
+  const where: Prisma.VoterWhereInput = {
+    ...(revokedIds.length > 0 ? { id: { notIn: revokedIds } } : {}),
+    ...(q
+      ? {
+          OR: [
+            { name: { contains: q } },
+            { email: { contains: q } },
+            { voterId: { contains: q } },
+          ],
+        }
+      : {}),
+  };
 
   const [rows, total] = await db.$transaction([
     db.voter.findMany({

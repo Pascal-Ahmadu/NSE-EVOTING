@@ -6,6 +6,8 @@ import { requireSameOrigin } from "@/lib/csrf";
 import { audit, requestMeta } from "@/lib/audit";
 import { buildPage, parsePageParams } from "@/lib/pagination";
 import { Title, Description, parseJson } from "@/lib/zod-helpers";
+import { getRevokedIds } from "@/lib/revocation";
+import { getElectionStates } from "@/lib/election-state";
 
 const CreateBody = z.object({
   name: Title,
@@ -19,8 +21,12 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const params = parsePageParams(url.searchParams);
 
+  const revokedIds = await getRevokedIds("election");
+  const where = revokedIds.length > 0 ? { id: { notIn: revokedIds } } : {};
+
   const [rows, total] = await db.$transaction([
     db.election.findMany({
+      where,
       skip: params.skip,
       take: params.take,
       orderBy: { createdAt: "desc" },
@@ -28,29 +34,33 @@ export async function GET(req: Request) {
         id: true,
         name: true,
         description: true,
-        status: true,
         createdAt: true,
-        openedAt: true,
-        closedAt: true,
         _count: { select: { positions: true, ballots: true } },
       },
     }),
-    db.election.count(),
+    db.election.count({ where }),
   ]);
+
+  // Compute current state from event log (latest event wins; falls back to
+  // the seed Election.status if no events).
+  const states = await getElectionStates(rows.map((r) => r.id));
 
   return NextResponse.json(
     buildPage(
-      rows.map((e) => ({
-        id: e.id,
-        name: e.name,
-        description: e.description,
-        status: e.status,
-        createdAt: e.createdAt.toISOString(),
-        openedAt: e.openedAt?.toISOString() ?? null,
-        closedAt: e.closedAt?.toISOString() ?? null,
-        positionCount: e._count.positions,
-        ballotCount: e._count.ballots,
-      })),
+      rows.map((e) => {
+        const state = states.get(e.id);
+        return {
+          id: e.id,
+          name: e.name,
+          description: e.description,
+          status: state?.status ?? "draft",
+          createdAt: e.createdAt.toISOString(),
+          openedAt: state?.openedAt?.toISOString() ?? null,
+          closedAt: state?.closedAt?.toISOString() ?? null,
+          positionCount: e._count.positions,
+          ballotCount: e._count.ballots,
+        };
+      }),
       total,
       params,
     ),

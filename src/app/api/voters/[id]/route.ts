@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-guards";
 import { requireSameOrigin } from "@/lib/csrf";
 import { audit, requestMeta } from "@/lib/audit";
+import { isRevoked, revoke } from "@/lib/revocation";
 
 export async function DELETE(
   req: Request,
@@ -23,21 +23,18 @@ export async function DELETE(
   if (!voter) {
     return NextResponse.json({ error: "Voter not found" }, { status: 404 });
   }
-
-  try {
-    await db.voter.delete({ where: { id } });
-  } catch (err) {
-    if (
-      err instanceof Prisma.PrismaClientKnownRequestError &&
-      err.code === "P2003"
-    ) {
-      return NextResponse.json(
-        { error: "Cannot remove a voter who has already submitted a ballot" },
-        { status: 409 },
-      );
-    }
-    throw err;
+  if (await isRevoked("voter", id)) {
+    return NextResponse.json(
+      { error: "Voter is already removed" },
+      { status: 409 },
+    );
   }
+  // INSERT revocation row instead of DELETE — preserves history.
+  await revoke({
+    targetType: "voter",
+    targetId: id,
+    revokedByAdminId: guard.value.adminId,
+  });
 
   const admin = await db.admin.findUnique({
     where: { id: guard.value.adminId },

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-guards";
 import { requireSameOrigin } from "@/lib/csrf";
 import { audit, requestMeta } from "@/lib/audit";
+import { isRevoked, revoke, getRevokedIds } from "@/lib/revocation";
+import { getElectionState } from "@/lib/election-state";
 
 export async function GET(
   _req: Request,
@@ -13,16 +14,16 @@ export async function GET(
   if (!guard.ok) return guard.response;
 
   const { id } = await ctx.params;
+  if (await isRevoked("election", id)) {
+    return NextResponse.json({ error: "Election not found" }, { status: 404 });
+  }
   const election = await db.election.findUnique({
     where: { id },
     select: {
       id: true,
       name: true,
       description: true,
-      status: true,
       createdAt: true,
-      openedAt: true,
-      closedAt: true,
       positions: {
         orderBy: { createdAt: "asc" },
         select: {
@@ -49,6 +50,21 @@ export async function GET(
     return NextResponse.json({ error: "Election not found" }, { status: 404 });
   }
 
+  // Filter out revoked positions / candidates from the response.
+  const [revokedPositionIds, revokedCandidateIds, state] = await Promise.all([
+    getRevokedIds("position"),
+    getRevokedIds("candidate"),
+    getElectionState(id),
+  ]);
+  const revPosSet = new Set(revokedPositionIds);
+  const revCandSet = new Set(revokedCandidateIds);
+  const positions = election.positions
+    .filter((p) => !revPosSet.has(p.id))
+    .map((p) => ({
+      ...p,
+      candidates: p.candidates.filter((c) => !revCandSet.has(c.id)),
+    }));
+
   const choiceCounts = await db.ballotChoice.groupBy({
     by: ["positionId", "candidateId"],
     where: { ballot: { electionId: id } },
@@ -59,7 +75,7 @@ export async function GET(
     countByKey.set(`${row.positionId}:${row.candidateId}`, row._count._all);
   }
 
-  const tally = election.positions.map((position) => {
+  const tally = positions.map((position) => {
     const results = position.candidates
       .map((c) => ({
         candidateId: c.id,
@@ -79,12 +95,12 @@ export async function GET(
       id: election.id,
       name: election.name,
       description: election.description,
-      status: election.status,
+      status: state.status,
       createdAt: election.createdAt.toISOString(),
-      openedAt: election.openedAt?.toISOString() ?? null,
-      closedAt: election.closedAt?.toISOString() ?? null,
+      openedAt: state.openedAt?.toISOString() ?? null,
+      closedAt: state.closedAt?.toISOString() ?? null,
       ballotCount: election._count.ballots,
-      positions: election.positions.map((p) => ({
+      positions: positions.map((p) => ({
         id: p.id,
         title: p.title,
         description: p.description,
@@ -118,23 +134,23 @@ export async function DELETE(
   if (!election) {
     return NextResponse.json({ error: "Election not found" }, { status: 404 });
   }
+  if (await isRevoked("election", id)) {
+    return NextResponse.json(
+      { error: "Election is already removed" },
+      { status: 409 },
+    );
+  }
   if (election._count.ballots > 0) {
     return NextResponse.json(
       { error: "Cannot delete an election that has received ballots" },
       { status: 409 },
     );
   }
-  try {
-    await db.election.delete({ where: { id } });
-  } catch (err) {
-    if (
-      err instanceof Prisma.PrismaClientKnownRequestError &&
-      err.code === "P2025"
-    ) {
-      return NextResponse.json({ error: "Election not found" }, { status: 404 });
-    }
-    throw err;
-  }
+  await revoke({
+    targetType: "election",
+    targetId: id,
+    revokedByAdminId: guard.value.adminId,
+  });
 
   const admin = await db.admin.findUnique({
     where: { id: guard.value.adminId },

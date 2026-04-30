@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { verifySecret } from "@/lib/password";
+import { getActiveAdminPasscodeHash } from "@/lib/credentials";
+import { isRevoked } from "@/lib/revocation";
 import { getAdminSession } from "@/lib/session";
 import { requireSameOrigin } from "@/lib/csrf";
 import {
@@ -43,7 +45,9 @@ export async function POST(req: Request) {
 
   const meta = requestMeta(req);
   const admin = await db.admin.findUnique({ where: { email } });
-  if (!admin || !(await verifySecret(passcode, admin.passcodeHash))) {
+  const revoked = admin ? await isRevoked("admin", admin.id) : false;
+  const activeHash = admin && !revoked ? await getActiveAdminPasscodeHash(admin.id) : null;
+  if (!admin || revoked || !activeHash || !(await verifySecret(passcode, activeHash))) {
     log.warn("admin_signin_failed", { email, ip });
     await audit({
       actorType: "admin",

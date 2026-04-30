@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { verifySecret } from "@/lib/password";
+import { getActiveVoterPasswordHash } from "@/lib/credentials";
+import { isRevoked } from "@/lib/revocation";
 import { getVoterSession } from "@/lib/session";
 import { requireSameOrigin } from "@/lib/csrf";
 import {
@@ -43,7 +45,9 @@ export async function POST(req: Request) {
 
   const meta = requestMeta(req);
   const voter = await db.voter.findUnique({ where: { voterId } });
-  if (!voter || !(await verifySecret(password, voter.passwordHash))) {
+  const revoked = voter ? await isRevoked("voter", voter.id) : false;
+  const activeHash = voter && !revoked ? await getActiveVoterPasswordHash(voter.id) : null;
+  if (!voter || revoked || !activeHash || !(await verifySecret(password, activeHash))) {
     log.warn("voter_signin_failed", { voterId, ip });
     await audit({
       actorType: "voter",
