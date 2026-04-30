@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth-guards";
 import { requireSameOrigin } from "@/lib/csrf";
 import { audit, requestMeta } from "@/lib/audit";
 import { isRevoked, revoke } from "@/lib/revocation";
+import { decryptVoterFields } from "@/lib/voter-pii";
 
 export async function DELETE(
   req: Request,
@@ -16,11 +17,11 @@ export async function DELETE(
   if (!guard.ok) return guard.response;
 
   const { id } = await ctx.params;
-  const voter = await db.voter.findUnique({
+  const voterRow = await db.voter.findUnique({
     where: { id },
     select: { email: true, voterId: true, name: true },
   });
-  if (!voter) {
+  if (!voterRow) {
     return NextResponse.json({ error: "Voter not found" }, { status: 404 });
   }
   if (await isRevoked("voter", id)) {
@@ -29,6 +30,7 @@ export async function DELETE(
       { status: 409 },
     );
   }
+  const voter = decryptVoterFields(voterRow);
   // INSERT revocation row instead of DELETE — preserves history.
   await revoke({
     targetType: "voter",

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-guards";
+import { hashPII } from "@/lib/pii";
 
 const CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -19,7 +20,7 @@ export async function POST() {
   for (let attempt = 0; attempt < 50; attempt++) {
     const candidate = `NSE-${makeSuffix(4)}`;
     const exists = await db.voter.findUnique({
-      where: { voterId: candidate },
+      where: { voterIdHash: hashPII(candidate) },
       select: { id: true },
     });
     if (!exists) return NextResponse.json({ voterId: candidate });

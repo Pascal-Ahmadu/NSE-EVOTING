@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getVoterSession } from "@/lib/session";
 import { requireSameOrigin } from "@/lib/csrf";
 import { audit, requestMeta } from "@/lib/audit";
+import { tryDecrypt } from "@/lib/pii";
 
 export async function POST(req: Request) {
   const csrf = requireSameOrigin(req);
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
     await audit({
       actorType: "voter",
       actorId: voterId,
-      actorLabel: voter?.voterId ?? null,
+      actorLabel: voter ? tryDecrypt(voter.voterId) : null,
       action: "voter.signout",
       meta: requestMeta(req),
     });

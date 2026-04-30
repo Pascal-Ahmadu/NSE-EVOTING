@@ -9,6 +9,8 @@ import { audit, requestMeta } from "@/lib/audit";
 import { buildPage, parsePageParams } from "@/lib/pagination";
 import { Email, Name, Password, VoterIdInput, parseJson } from "@/lib/zod-helpers";
 import { getRevokedIds } from "@/lib/revocation";
+import { decryptVoterFields, encryptVoter } from "@/lib/voter-pii";
+import { hashPII } from "@/lib/pii";
 
 const CreateBody = z.object({
   name: Name,
@@ -35,33 +37,39 @@ export async function GET(req: Request) {
   const q = url.searchParams.get("q")?.trim() ?? "";
 
   const revokedIds = await getRevokedIds("voter");
-  const where: Prisma.VoterWhereInput = {
-    ...(revokedIds.length > 0 ? { id: { notIn: revokedIds } } : {}),
-    ...(q
-      ? {
-          OR: [
-            { name: { contains: q } },
-            { email: { contains: q } },
-            { voterId: { contains: q } },
-          ],
-        }
-      : {}),
-  };
+  // Encrypted columns can't be searched by SQL `contains`. Fetch all live rows,
+  // decrypt in memory, then filter + paginate. Voter counts in this app stay
+  // small enough that this is fine; revisit if it grows past a few thousand.
+  const baseWhere: Prisma.VoterWhereInput =
+    revokedIds.length > 0 ? { id: { notIn: revokedIds } } : {};
 
-  const [rows, total] = await db.$transaction([
-    db.voter.findMany({
-      where,
-      skip: params.skip,
-      take: params.take,
-      orderBy: { registeredAt: "desc" },
-      select: SAFE_FIELDS,
-    }),
-    db.voter.count({ where }),
-  ]);
+  const allRows = await db.voter.findMany({
+    where: baseWhere,
+    orderBy: { registeredAt: "desc" },
+    select: SAFE_FIELDS,
+  });
+
+  const decrypted = allRows.map((v) => ({
+    ...decryptVoterFields(v),
+    _count: v._count,
+  }));
+
+  const needle = q.toLowerCase();
+  const filtered = needle
+    ? decrypted.filter(
+        (v) =>
+          v.name.toLowerCase().includes(needle) ||
+          v.email.toLowerCase().includes(needle) ||
+          v.voterId.toLowerCase().includes(needle),
+      )
+    : decrypted;
+
+  const total = filtered.length;
+  const page = filtered.slice(params.skip, params.skip + params.take);
 
   return NextResponse.json(
     buildPage(
-      rows.map((v) => ({
+      page.map((v) => ({
         id: v.id,
         name: v.name,
         email: v.email,
@@ -86,20 +94,39 @@ export async function POST(req: Request) {
   if (!parsed.ok) return parsed.response;
   const { name, email, voterId, password } = parsed.data;
 
+  // Pre-check uniqueness against the hash columns so we can return a clean 409
+  // before attempting the insert. The DB unique index is the source of truth.
+  const emailHash = hashPII(email);
+  const voterIdHash = hashPII(voterId);
+  const existing = await db.voter.findFirst({
+    where: { OR: [{ emailHash }, { voterIdHash }] },
+    select: { emailHash: true, voterIdHash: true },
+  });
+  if (existing) {
+    if (existing.emailHash === emailHash) {
+      return NextResponse.json(
+        { error: "A voter with this email already exists" },
+        { status: 409 },
+      );
+    }
+    if (existing.voterIdHash === voterIdHash) {
+      return NextResponse.json(
+        { error: "A voter with this voter ID already exists" },
+        { status: 409 },
+      );
+    }
+  }
+
+  const encrypted = encryptVoter({ name, email, voterId });
   let created;
   try {
     created = await db.voter.create({
       data: {
-        name,
-        email,
-        voterId,
+        ...encrypted,
         passwordHash: await hashSecret(password),
       },
       select: {
         id: true,
-        name: true,
-        email: true,
-        voterId: true,
         registeredAt: true,
       },
     });
@@ -109,13 +136,13 @@ export async function POST(req: Request) {
       err.code === "P2002"
     ) {
       const fields = (err.meta?.target as string[] | undefined) ?? [];
-      if (fields.includes("email")) {
+      if (fields.includes("emailHash")) {
         return NextResponse.json(
           { error: "A voter with this email already exists" },
           { status: 409 },
         );
       }
-      if (fields.includes("voterId")) {
+      if (fields.includes("voterIdHash")) {
         return NextResponse.json(
           { error: "A voter with this voter ID already exists" },
           { status: 409 },
@@ -136,7 +163,7 @@ export async function POST(req: Request) {
     action: "voter.register",
     targetType: "voter",
     targetId: created.id,
-    details: { email: created.email, voterId: created.voterId },
+    details: { email, voterId },
     ip: meta.ip,
     userAgent: meta.userAgent,
   });
@@ -144,7 +171,10 @@ export async function POST(req: Request) {
   return NextResponse.json(
     {
       voter: {
-        ...created,
+        id: created.id,
+        name,
+        email,
+        voterId,
         registeredAt: created.registeredAt.toISOString(),
         password,
       },

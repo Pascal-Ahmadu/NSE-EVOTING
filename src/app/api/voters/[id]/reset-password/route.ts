@@ -5,6 +5,7 @@ import { isRevoked } from "@/lib/revocation";
 import { requireAdmin } from "@/lib/auth-guards";
 import { requireSameOrigin } from "@/lib/csrf";
 import { audit, requestMeta } from "@/lib/audit";
+import { decryptVoterFields } from "@/lib/voter-pii";
 
 const CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const PASSWORD_LENGTH = 8;
@@ -28,7 +29,7 @@ export async function POST(
   if (!guard.ok) return guard.response;
 
   const { id } = await ctx.params;
-  const voter = await db.voter.findUnique({
+  const voterRow = await db.voter.findUnique({
     where: { id },
     select: {
       id: true,
@@ -38,15 +39,16 @@ export async function POST(
       registeredAt: true,
     },
   });
-  if (!voter) {
+  if (!voterRow) {
     return NextResponse.json({ error: "Voter not found" }, { status: 404 });
   }
-  if (await isRevoked("voter", voter.id)) {
+  if (await isRevoked("voter", voterRow.id)) {
     return NextResponse.json(
       { error: "Voter has been removed" },
       { status: 410 },
     );
   }
+  const voter = decryptVoterFields(voterRow);
   const password = generatePassword();
   await rotateVoterPassword(voter.id, password);
 

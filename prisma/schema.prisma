@@ -39,9 +39,16 @@ model AdminCredential {
 
 model Voter {
   id           String   @id @default(cuid())
+  /// `name`, `email`, and `voterId` are stored AES-256-GCM encrypted.
+  /// Each insert uses a fresh nonce, so ciphertext equality means nothing —
+  /// uniqueness is enforced via the `*Hash` columns instead.
   name         String
-  email        String   @unique
-  voterId      String   @unique
+  email        String
+  voterId      String
+  /// HMAC-SHA256 of the plaintext email — used for sign-in lookup + dedup.
+  /// Nullable to allow rolling rollout from plaintext rows.
+  emailHash    String?  @unique
+  voterIdHash  String?  @unique
   passwordHash String
   registeredAt DateTime @default(now())
 

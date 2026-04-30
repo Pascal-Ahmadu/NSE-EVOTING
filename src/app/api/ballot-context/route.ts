@@ -3,22 +3,24 @@ import { db } from "@/lib/db";
 import { requireVoter } from "@/lib/auth-guards";
 import { getRevokedIds, isRevoked } from "@/lib/revocation";
 import { findElectionIdsByStatus } from "@/lib/election-state";
+import { decryptVoterFields } from "@/lib/voter-pii";
 
 export async function GET() {
   const guard = await requireVoter();
   if (!guard.ok) return guard.response;
   const voterId = guard.value.voterId;
 
-  const voter = await db.voter.findUnique({
+  const voterRow = await db.voter.findUnique({
     where: { id: voterId },
     select: { id: true, name: true, email: true, voterId: true },
   });
-  if (!voter) {
+  if (!voterRow) {
     return NextResponse.json({ error: "Voter not found" }, { status: 404 });
   }
-  if (await isRevoked("voter", voter.id)) {
+  if (await isRevoked("voter", voterRow.id)) {
     return NextResponse.json({ error: "Voter not found" }, { status: 404 });
   }
+  const voter = decryptVoterFields(voterRow);
 
   // Find currently-open elections via the event log
   const openIds = await findElectionIdsByStatus("open");

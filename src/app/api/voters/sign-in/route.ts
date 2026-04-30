@@ -14,6 +14,8 @@ import {
 import { VoterIdInput, parseJson } from "@/lib/zod-helpers";
 import { audit, requestMeta } from "@/lib/audit";
 import { log } from "@/lib/logger";
+import { hashPII } from "@/lib/pii";
+import { decryptVoterFields } from "@/lib/voter-pii";
 
 const Body = z.object({
   voterId: VoterIdInput,
@@ -44,7 +46,15 @@ export async function POST(req: Request) {
   if (!idLimit.ok) return rateLimitResponse(idLimit.retryAfterSec);
 
   const meta = requestMeta(req);
-  const voter = await db.voter.findUnique({ where: { voterId } });
+
+  // Primary lookup is by HMAC over the encrypted voterId column. Fall back
+  // to plaintext match so any pre-encryption rows still authenticate.
+  const voterIdHash = hashPII(voterId);
+  let voter = await db.voter.findUnique({ where: { voterIdHash } });
+  if (!voter) {
+    voter = await db.voter.findFirst({ where: { voterId } });
+  }
+
   const revoked = voter ? await isRevoked("voter", voter.id) : false;
   const activeHash = voter && !revoked ? await getActiveVoterPasswordHash(voter.id) : null;
   if (!voter || revoked || !activeHash || !(await verifySecret(password, activeHash))) {
@@ -69,10 +79,12 @@ export async function POST(req: Request) {
   session.voterId = voter.id;
   await session.save();
 
+  const decoded = decryptVoterFields(voter);
+
   await audit({
     actorType: "voter",
     actorId: voter.id,
-    actorLabel: voter.voterId,
+    actorLabel: decoded.voterId,
     action: "voter.signin",
     meta,
   });
@@ -80,9 +92,9 @@ export async function POST(req: Request) {
   return NextResponse.json({
     voter: {
       id: voter.id,
-      name: voter.name,
-      email: voter.email,
-      voterId: voter.voterId,
+      name: decoded.name,
+      email: decoded.email,
+      voterId: decoded.voterId,
     },
   });
 }

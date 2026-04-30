@@ -7,6 +7,7 @@ import { requireVoter } from "@/lib/auth-guards";
 import { requireSameOrigin } from "@/lib/csrf";
 import { parseJson } from "@/lib/zod-helpers";
 import { audit, requestMeta } from "@/lib/audit";
+import { tryDecrypt } from "@/lib/pii";
 
 const BodySchema = z.object({
   electionId: z.string().min(1),
@@ -137,7 +138,7 @@ export async function POST(req: Request) {
   await audit({
     actorType: "voter",
     actorId: voterId,
-    actorLabel: voter?.voterId ?? null,
+    actorLabel: voter ? tryDecrypt(voter.voterId) : null,
     action: "ballot.submit",
     targetType: "election",
     targetId: electionId,
