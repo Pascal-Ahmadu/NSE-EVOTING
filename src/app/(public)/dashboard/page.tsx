@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import StatusBadge from "@/components/voting/StatusBadge";
 import { DashboardSkeleton } from "@/components/voting/skeletons";
-import { ChevronLeftIcon } from "@/icons";
 import { apiCall } from "@/lib/api-client";
 
 interface ResultRow {
@@ -53,7 +53,15 @@ const formatPct = (votes: number, total: number): string =>
   total === 0 ? "0%" : `${Math.round((votes / total) * 100)}%`;
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    await apiCall("/api/voters/sign-out", { method: "POST" });
+    router.replace("/");
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -137,18 +145,19 @@ export default function DashboardPage() {
       <footer className="border-t border-gray-200 pt-6 dark:border-gray-800">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
-            href="/"
-            className="inline-flex items-center gap-1 text-sm text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400"
+            href="/ballot"
+            className="text-sm font-medium text-brand-500 transition-colors hover:text-brand-600 dark:text-brand-400"
           >
-            <ChevronLeftIcon aria-hidden="true" className="h-4 w-4" />
-            Back
+            Go to ballot
           </Link>
-          <Link
-            href="/"
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-medium text-white shadow-theme-xs transition-colors hover:bg-brand-600"
+          <button
+            type="button"
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-white/5"
           >
-            Sign in to vote
-          </Link>
+            {signingOut ? "Signing out…" : "Sign out"}
+          </button>
         </div>
       </footer>
     </div>

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { requireAdminOrVoter } from "@/lib/auth-guards";
 
 interface CandidateLite {
   id: string;
@@ -14,6 +15,9 @@ interface PositionLite {
 }
 
 export async function GET() {
+  const guard = await requireAdminOrVoter();
+  if (!guard.ok) return guard.response;
+
   const [openElections, closedElections, totalVoters] = await Promise.all([
     db.election.findMany({
       where: { status: "open" },

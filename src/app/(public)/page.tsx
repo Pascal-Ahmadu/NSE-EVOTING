@@ -142,12 +142,6 @@ export default function VoterSignInPage() {
 
       <div className="mt-6 flex flex-col items-center gap-3">
         <Link
-          href="/dashboard"
-          className="text-base font-medium text-brand-500 transition-colors hover:text-brand-600 dark:text-brand-400"
-        >
-          View live dashboard
-        </Link>
-        <Link
           href="/admin/sign-in"
           className="inline-flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400"
         >

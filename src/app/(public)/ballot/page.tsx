@@ -113,7 +113,8 @@ export default function BallotPage() {
       setSubmitting(false);
       return;
     }
-    await apiCall("/api/voters/sign-out", { method: "POST" });
+    // Keep the voter signed in so they can browse to /dashboard from the
+    // confirmation page. Sign-out is now an explicit action.
     router.push("/confirmation?status=submitted");
   };
 

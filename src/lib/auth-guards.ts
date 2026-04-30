@@ -26,3 +26,20 @@ export async function requireVoter(): Promise<Guard<{ voterId: string }>> {
   }
   return { ok: true, value: { voterId: session.voterId } };
 }
+
+export async function requireAdminOrVoter(): Promise<
+  Guard<{ adminId?: string; voterId?: string }>
+> {
+  const adminSession = await getAdminSession();
+  if (adminSession.adminId) {
+    return { ok: true, value: { adminId: adminSession.adminId } };
+  }
+  const voterSession = await getVoterSession();
+  if (voterSession.voterId) {
+    return { ok: true, value: { voterId: voterSession.voterId } };
+  }
+  return {
+    ok: false,
+    response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+  };
+}
