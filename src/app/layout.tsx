@@ -11,9 +11,8 @@ const lato = Lato({
 });
 
 export const metadata: Metadata = {
-  title: "NSE Voting",
-  description:
-    "Nigerian Society of Engineers — secure online voting platform",
+  title: "VOTAMAK",
+  description: "VOTAMAK — secure online voting platform",
 };
 
 export default function RootLayout({

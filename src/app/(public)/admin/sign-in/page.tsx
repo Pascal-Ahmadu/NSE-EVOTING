@@ -63,14 +63,14 @@ export default function AdminSignInPage() {
         <Alert
           variant="info"
           title="Development mode"
-          message="On a fresh database the seed admin is admin@example.com / NSE1234. Change the passcode after the first sign-in. This banner is hidden in production."
+          message="On a fresh database the seed admin is admin@example.com / VMK1234. Change the passcode after the first sign-in. This banner is hidden in production."
         />
       )}
       <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200 sm:p-8 dark:bg-gray-900 dark:ring-gray-800">
         <div className="mb-6 text-center">
           <Image
             src="/images/NSE-Logo.png"
-            alt="Nigerian Society of Engineers"
+            alt="VOTAMAK"
             width={400}
             height={120}
             priority
@@ -151,7 +151,7 @@ export default function AdminSignInPage() {
             href="/"
             className="inline-flex items-center gap-1 text-sm text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400"
           >
-            <ChevronLeftIcon aria-hidden="true" className="h-4 w-4" />
+            <ChevronLeftIcon aria-hidden="true" />
             Back to voter sign in
           </Link>
         </div>

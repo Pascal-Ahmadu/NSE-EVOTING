@@ -52,23 +52,23 @@ export default function VoterSignInPage() {
       <div className="mb-8 flex flex-col items-center text-center">
         <Image
           src="/images/NSE-Logo.png"
-          alt="Nigerian Society of Engineers"
+          alt="VOTAMAK"
           width={400}
           height={120}
           priority
           className="h-14 w-auto dark:brightness-0 dark:invert"
         />
-        <p className="mt-3 text-base font-semibold text-gray-900 dark:text-white">
-          Makurdi Branch
+        <p className="mt-3 text-lg font-bold tracking-tight text-gray-900 dark:text-white">
+          VOTAMAK
         </p>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          2026 Branch Election
+        <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">
+          Makurdi Branch Election
         </p>
         <h1 className="mt-7 text-3xl font-semibold text-gray-900 dark:text-white">
           Sign in to vote
         </h1>
         <p className="mt-2 max-w-xs text-base text-gray-500 dark:text-gray-400">
-          Use your NSE number and the password sent by the administrator.
+          Use your Voter ID and the password sent by the administrator.
         </p>
       </div>
 
@@ -84,13 +84,13 @@ export default function VoterSignInPage() {
           )}
           <div>
             <Label htmlFor="voter-id" className="text-base">
-              NSE Number
+              Voter ID
             </Label>
             <Input
               id="voter-id"
               type="text"
               size="lg"
-              placeholder="e.g. NSE-1234"
+              placeholder="e.g. VMK-1234"
               value={voterId}
               onChange={(e) => {
                 setVoterId(e.target.value);
@@ -146,7 +146,7 @@ export default function VoterSignInPage() {
           className="inline-flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400"
         >
           Election administrator sign in
-          <ChevronRightIcon aria-hidden="true" className="h-4 w-4" />
+          <ChevronRightIcon aria-hidden="true" />
         </Link>
       </div>
     </div>

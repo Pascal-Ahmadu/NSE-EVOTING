@@ -21,7 +21,7 @@ export interface AuditEntry {
   // Canonical shape
   actorType?: ActorType;
   actorId?: string | null;
-  /** Human-readable label (email for admin, NSE number for voter). */
+  /** Human-readable label (email for admin, Voter ID for voter). */
   actorLabel?: string | null;
   meta?: RequestMeta;
 

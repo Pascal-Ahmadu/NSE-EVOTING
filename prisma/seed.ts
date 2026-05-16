@@ -28,7 +28,7 @@ function requireSeedEnv(): {
   return {
     email: email ?? "admin@example.com",
     name: name ?? "Default Admin",
-    passcode: passcode ?? "NSE1234",
+    passcode: passcode ?? "VMK1234",
   };
 }
 

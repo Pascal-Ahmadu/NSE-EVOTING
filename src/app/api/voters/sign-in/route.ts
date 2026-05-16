@@ -69,7 +69,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "We couldn't sign you in. Check your NSE number and password — or contact your election administrator.",
+          "We couldn't sign you in. Check your Voter ID and password — or contact your election administrator.",
       },
       { status: 401 },
     );

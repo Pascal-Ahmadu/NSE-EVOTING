@@ -18,7 +18,7 @@ export async function POST() {
   if (!guard.ok) return guard.response;
 
   for (let attempt = 0; attempt < 50; attempt++) {
-    const candidate = `NSE-${makeSuffix(4)}`;
+    const candidate = `VMK-${makeSuffix(4)}`;
     const exists = await db.voter.findUnique({
       where: { voterIdHash: hashPII(candidate) },
       select: { id: true },

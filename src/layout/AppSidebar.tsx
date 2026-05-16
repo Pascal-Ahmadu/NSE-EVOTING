@@ -57,12 +57,12 @@ const AppSidebar: React.FC = () => {
         <Link
           href="/admin"
           className="flex items-center"
-          aria-label="Nigerian Society of Engineers — Makurdi Branch"
+          aria-label="VOTAMAK — Makurdi Branch"
         >
           {showLabels ? (
             <Image
               src="/images/NSE-Logo.png"
-              alt="Nigerian Society of Engineers"
+              alt="VOTAMAK"
               width={400}
               height={120}
               priority
@@ -71,7 +71,7 @@ const AppSidebar: React.FC = () => {
           ) : (
             <span
               role="img"
-              aria-label="Nigerian Society of Engineers"
+              aria-label="VOTAMAK"
               className="block h-11 w-11 rounded-xl bg-white ring-1 ring-gray-200 dark:ring-gray-700"
               style={{
                 backgroundImage: "url('/images/NSE-Logo.png')",
@@ -84,11 +84,11 @@ const AppSidebar: React.FC = () => {
         </Link>
         {showLabels && (
           <div className="mt-2">
-            <p className="text-sm font-semibold text-gray-900 dark:text-white">
-              Makurdi Branch
+            <p className="text-sm font-bold tracking-tight text-gray-900 dark:text-white">
+              VOTAMAK
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              2026 Branch Election
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+              Makurdi Branch
             </p>
           </div>
         )}
