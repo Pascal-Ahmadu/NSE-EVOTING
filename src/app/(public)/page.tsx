@@ -50,7 +50,15 @@ export default function VoterSignInPage() {
   return (
     <div className="w-full max-w-md self-center">
       <div className="mb-8 flex flex-col items-center text-center">
-        <div className="text-4xl font-extrabold tracking-tight text-brand-600 dark:text-brand-400">
+        <Image
+          src="/images/NSE-Logo.png"
+          alt="VOTAMAK Logo"
+          width={400}
+          height={120}
+          priority
+          className="h-14 w-auto dark:brightness-0 dark:invert"
+        />
+        <div className="mt-3 text-4xl font-extrabold tracking-tight text-brand-600 dark:text-brand-400">
           VOTAMAK
         </div>
         <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">
