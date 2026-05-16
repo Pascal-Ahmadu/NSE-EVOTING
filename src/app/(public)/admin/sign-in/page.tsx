@@ -68,14 +68,9 @@ export default function AdminSignInPage() {
       )}
       <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200 sm:p-8 dark:bg-gray-900 dark:ring-gray-800">
         <div className="mb-6 text-center">
-          <Image
-            src="/images/NSE-Logo.png"
-            alt="VOTAMAK"
-            width={400}
-            height={120}
-            priority
-            className="mx-auto mb-4 h-12 w-auto dark:brightness-0 dark:invert"
-          />
+          <div className="mx-auto mb-4 text-4xl font-extrabold tracking-tight text-brand-600 dark:text-brand-400">
+            VOTAMAKE
+          </div>
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
             Administrator sign in
           </h1>

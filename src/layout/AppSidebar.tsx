@@ -50,19 +50,18 @@ const AppSidebar: React.FC = () => {
       aria-label="Administration sidebar"
     >
       <div
-        className={`flex flex-col py-4 ${
-          showLabels ? "items-start" : "items-center"
-        }`}
+        className={`flex flex-col py-4 ${showLabels ? "items-start" : "items-center"
+          }`}
       >
         <Link
           href="/admin"
           className="flex items-center"
-          aria-label="VOTAMAK — Makurdi Branch"
+          aria-label="NSE — Makurdi Branch"
         >
           {showLabels ? (
             <Image
               src="/images/NSE-Logo.png"
-              alt="VOTAMAK"
+              alt="NSE"
               width={400}
               height={120}
               priority
@@ -71,7 +70,7 @@ const AppSidebar: React.FC = () => {
           ) : (
             <span
               role="img"
-              aria-label="VOTAMAK"
+              aria-label="NSE-Makurdi"
               className="block h-11 w-11 rounded-xl bg-white ring-1 ring-gray-200 dark:ring-gray-700"
               style={{
                 backgroundImage: "url('/images/NSE-Logo.png')",
@@ -85,7 +84,7 @@ const AppSidebar: React.FC = () => {
         {showLabels && (
           <div className="mt-2">
             <p className="text-sm font-bold tracking-tight text-gray-900 dark:text-white">
-              VOTAMAK
+              NSE
             </p>
             <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
               Makurdi Branch
@@ -104,7 +103,7 @@ const AppSidebar: React.FC = () => {
           {navItems.map((item) => {
             const active = item.matchPrefix
               ? pathname === item.path ||
-                pathname.startsWith(`${item.matchPrefix}/`)
+              pathname.startsWith(`${item.matchPrefix}/`)
               : pathname === item.path;
             return (
               <li key={item.path}>
@@ -112,15 +111,13 @@ const AppSidebar: React.FC = () => {
                   href={item.path}
                   aria-current={active ? "page" : undefined}
                   title={showLabels ? undefined : item.name}
-                  className={`flex items-center gap-3 rounded-lg text-sm font-medium transition-colors ${
-                    showLabels
+                  className={`flex items-center gap-3 rounded-lg text-sm font-medium transition-colors ${showLabels
                       ? "justify-start px-3 py-2.5"
                       : "h-11 w-11 mx-auto justify-center"
-                  } ${
-                    active
+                    } ${active
                       ? "bg-brand-500/10 text-brand-500 dark:bg-brand-500/15"
                       : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/3"
-                  }`}
+                    }`}
                 >
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center">
                     {item.icon}
