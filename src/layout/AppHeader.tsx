@@ -61,7 +61,7 @@ const AppHeader: React.FC = () => {
 
       <div className="flex-1" />
 
-      <div className="flex items-center gap-3">
+      <div id="tour-header-actions" className="flex items-center gap-3">
         {admin && (
           <div className="hidden text-right sm:block">
             <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
@@ -71,6 +71,19 @@ const AppHeader: React.FC = () => {
           </div>
         )}
         <ThemeToggleButton />
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new Event("start-admin-tour"))}
+          title="Take a tour"
+          aria-label="Take a tour"
+          className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8" />
+            <path d="M12 17v-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            <circle cx="12" cy="8" r="1" fill="currentColor" />
+          </svg>
+        </button>
         <button
           type="button"
           onClick={handleSignOut}

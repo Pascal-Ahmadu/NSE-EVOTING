@@ -18,6 +18,7 @@ interface NavItem {
   path: string;
   icon: React.ReactNode;
   matchPrefix?: string;
+  tourId?: string;
 }
 
 const navItems: NavItem[] = [
@@ -27,11 +28,12 @@ const navItems: NavItem[] = [
     path: "/admin/elections",
     icon: <BoxIconLine />,
     matchPrefix: "/admin/elections",
+    tourId: "tour-admin-elections",
   },
-  { name: "Voters", path: "/admin/voters", icon: <GroupIcon /> },
-  { name: "Results", path: "/admin/results", icon: <PieChartIcon /> },
+  { name: "Voters", path: "/admin/voters", icon: <GroupIcon />, tourId: "tour-admin-voters" },
+  { name: "Results", path: "/admin/results", icon: <PieChartIcon />, tourId: "tour-admin-results" },
   { name: "Admins", path: "/admin/admins", icon: <UserCircleIcon /> },
-  { name: "Audit log", path: "/admin/audit", icon: <DocsIcon /> },
+  { name: "Audit log", path: "/admin/audit", icon: <DocsIcon />, tourId: "tour-admin-audit" },
 ];
 
 const AppSidebar: React.FC = () => {
@@ -109,6 +111,7 @@ const AppSidebar: React.FC = () => {
               <li key={item.path}>
                 <Link
                   href={item.path}
+                  id={item.tourId}
                   aria-current={active ? "page" : undefined}
                   title={showLabels ? undefined : item.name}
                   className={`flex items-center gap-3 rounded-lg text-sm font-medium transition-colors ${showLabels

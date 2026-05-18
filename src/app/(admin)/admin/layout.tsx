@@ -7,6 +7,7 @@ import AppHeader from "@/layout/AppHeader";
 import AppSidebar from "@/layout/AppSidebar";
 import Backdrop from "@/layout/Backdrop";
 import { apiCall } from "@/lib/api-client";
+import SystemTour from "@/components/ui/tour/SystemTour";
 
 interface AdminMe {
   admin: { id: string; name: string; email: string } | null;
@@ -56,6 +57,7 @@ export default function AdminLayout({
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 xl:flex">
+      <SystemTour />
       <AppSidebar />
       <Backdrop />
       <div className={`flex-1 transition-all duration-300 ease-in-out ${sidebarMargin}`}>

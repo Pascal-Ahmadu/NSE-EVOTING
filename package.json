@@ -30,6 +30,7 @@
     "apexcharts": "^4.7.0",
     "autoprefixer": "^10.4.22",
     "bcryptjs": "^3.0.3",
+    "driver.js": "^1.4.0",
     "flatpickr": "^4.6.13",
     "iron-session": "^8.0.4",
     "next": "^16.1.6",
