@@ -8,6 +8,7 @@ import { requireSameOrigin } from "@/lib/csrf";
 import { parseJson } from "@/lib/zod-helpers";
 import { audit, requestMeta } from "@/lib/audit";
 import { tryDecrypt } from "@/lib/pii";
+import { getElectionState } from "@/lib/election-state";
 
 const BodySchema = z.object({
   electionId: z.string().min(1),
@@ -36,7 +37,6 @@ export async function POST(req: Request) {
   const election = await db.election.findUnique({
     where: { id: electionId },
     select: {
-      status: true,
       positions: {
         select: { id: true, candidates: { select: { id: true } } },
       },
@@ -45,7 +45,11 @@ export async function POST(req: Request) {
   if (!election) {
     return NextResponse.json({ error: "Election not found" }, { status: 404 });
   }
-  if (election.status !== "open") {
+
+  // Use the event-log state — Election.status column is never mutated after
+  // creation, so checking it directly would always read "draft".
+  const state = await getElectionState(electionId);
+  if (state.status !== "open") {
     return NextResponse.json(
       { error: "This election is not open for voting" },
       { status: 409 },
