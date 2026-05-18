@@ -310,7 +310,7 @@ export default function ElectionDetailPage() {
         ]}
       />
 
-      <header className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-800">
+      <header id="tour-election-header" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-800">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-3">
@@ -377,7 +377,7 @@ export default function ElectionDetailPage() {
       </header>
 
       {isDraft && (
-        <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-800">
+        <section id="tour-add-position-section" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-800">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Add a position
           </h2>
@@ -428,7 +428,7 @@ export default function ElectionDetailPage() {
         </section>
       )}
 
-      <section className="space-y-4">
+      <section id="tour-positions-section" className="space-y-4">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
           {isDraft ? "Positions & candidates" : "Ballot structure"}
         </h2>
@@ -654,7 +654,7 @@ export default function ElectionDetailPage() {
       </section>
 
       {(isOpen || isClosed) && (
-        <section className="space-y-3">
+        <section id="tour-election-results" className="space-y-3">
           <div className="flex items-end justify-between">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               {isOpen ? "Live results" : "Final results"}

@@ -98,7 +98,7 @@ export default function DashboardPage() {
         </p>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div id="tour-stat-cards" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Elections"
           value={elections.total}
@@ -128,7 +128,7 @@ export default function DashboardPage() {
       </div>
 
       <section className="grid gap-6 lg:grid-cols-3">
-        <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200 lg:col-span-2 dark:bg-gray-900 dark:ring-gray-800">
+        <div id="tour-recent-elections" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200 lg:col-span-2 dark:bg-gray-900 dark:ring-gray-800">
           <div className="flex items-end justify-between gap-3">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               Recent elections
@@ -179,7 +179,7 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-800">
+        <div id="tour-quick-actions" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-800">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Quick actions
           </h2>

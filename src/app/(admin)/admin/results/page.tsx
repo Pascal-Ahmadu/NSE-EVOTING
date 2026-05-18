@@ -99,7 +99,7 @@ export default function ResultsPage() {
           { label: "Results" },
         ]}
       />
-      <header className="flex flex-wrap items-end justify-between gap-3">
+      <header id="tour-results-header" className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
             Results
@@ -135,8 +135,8 @@ export default function ResultsPage() {
           </p>
         </div>
       ) : (
-        all.map((election) => (
-          <section key={election.id} className="space-y-4">
+        all.map((election, i) => (
+          <section key={election.id} id={i === 0 ? "tour-results-elections" : undefined} className="space-y-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <div className="flex flex-wrap items-center gap-2">

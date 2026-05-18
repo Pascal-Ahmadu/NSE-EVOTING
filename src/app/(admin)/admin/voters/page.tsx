@@ -244,9 +244,11 @@ export default function VotersPage() {
             Only registered voters can sign in to cast a ballot.
           </p>
         </div>
-        <Button startIcon={<PlusIcon />} onClick={openForm}>
-          Register voter
-        </Button>
+        <span id="tour-voters-register-btn">
+          <Button startIcon={<PlusIcon />} onClick={openForm}>
+            Register voter
+          </Button>
+        </span>
       </header>
 
       {page.total === 0 && !filter ? (
@@ -264,7 +266,7 @@ export default function VotersPage() {
           </div>
         </div>
       ) : (
-        <div className="rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-800">
+        <div id="tour-voters-table" className="rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-800">
           <div className="border-b border-gray-200 p-4 dark:border-gray-800">
             <Input
               id="voter-filter"

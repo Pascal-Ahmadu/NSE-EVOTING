@@ -148,9 +148,11 @@ export default function AdminsPage() {
             People who can manage elections, voters, and results.
           </p>
         </div>
-        <Button startIcon={<PlusIcon />} onClick={() => setAdding(true)}>
-          Add admin
-        </Button>
+        <span id="tour-admins-add-btn">
+          <Button startIcon={<PlusIcon />} onClick={() => setAdding(true)}>
+            Add admin
+          </Button>
+        </span>
       </header>
 
       {statusError && (
@@ -159,7 +161,7 @@ export default function AdminsPage() {
         </p>
       )}
 
-      <div className="rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-800">
+      <div id="tour-admins-table" className="rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-800">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500 dark:bg-gray-800/60 dark:text-gray-400">

@@ -131,7 +131,7 @@ export default function AuditPage() {
       </header>
 
       <div className="rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-800">
-        <div className="grid gap-3 border-b border-gray-200 p-4 dark:border-gray-800 sm:grid-cols-[1fr_180px]">
+        <div id="tour-audit-filters" className="grid gap-3 border-b border-gray-200 p-4 dark:border-gray-800 sm:grid-cols-[1fr_180px]">
           <Input
             id="audit-q"
             type="text"
@@ -152,7 +152,7 @@ export default function AuditPage() {
             <option value="voter">Voters only</option>
           </select>
         </div>
-        <div className="overflow-x-auto">
+        <div id="tour-audit-table" className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500 dark:bg-gray-800/60 dark:text-gray-400">
               <tr>

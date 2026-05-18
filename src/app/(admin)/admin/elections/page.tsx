@@ -127,9 +127,11 @@ export default function ElectionsListPage() {
             Create elections, add positions and candidates, open them for voting.
           </p>
         </div>
-        <Button startIcon={<PlusIcon />} onClick={() => setCreating(true)}>
-          New election
-        </Button>
+        <span id="tour-elections-new-btn">
+          <Button startIcon={<PlusIcon />} onClick={() => setCreating(true)}>
+            New election
+          </Button>
+        </span>
       </header>
 
       {page.total === 0 ? (
@@ -148,7 +150,7 @@ export default function ElectionsListPage() {
         </div>
       ) : (
         <>
-          <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <ul id="tour-elections-list" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {page.data.map((election) => (
               <li key={election.id}>
                 <Link
