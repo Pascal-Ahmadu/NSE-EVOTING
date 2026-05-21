@@ -87,7 +87,7 @@ export async function getElectionStates(
 export async function transitionElection(input: {
   electionId: string;
   status: ElectionStatus;
-  changedByAdminId: string;
+  changedByAdminId: string | null;
 }): Promise<void> {
   await db.electionStatusEvent.create({
     data: {
@@ -96,6 +96,70 @@ export async function transitionElection(input: {
       changedByAdminId: input.changedByAdminId,
     },
   });
+}
+
+/**
+ * Lazily applies scheduled open/close transitions for a single election.
+ * Called on every GET of that election so no background job is needed.
+ */
+export async function applySchedule(electionId: string): Promise<void> {
+  const election = await db.election.findUnique({
+    where: { id: electionId },
+    select: { scheduledOpenAt: true, scheduledCloseAt: true },
+  });
+  if (!election) return;
+  if (!election.scheduledOpenAt && !election.scheduledCloseAt) return;
+
+  const state = await getElectionState(electionId);
+  const now = new Date();
+
+  if (
+    state.status === "draft" &&
+    election.scheduledOpenAt &&
+    election.scheduledOpenAt <= now
+  ) {
+    // Verify election is ready (at least one position with at least one candidate)
+    const positions = await db.position.findMany({
+      where: { electionId },
+      select: { _count: { select: { candidates: true } } },
+    });
+    const ready =
+      positions.length > 0 && positions.every((p) => p._count.candidates > 0);
+    if (ready) {
+      await transitionElection({ electionId, status: "open", changedByAdminId: null });
+      // Refresh state for close check below
+      state.status = "open";
+    }
+  }
+
+  if (
+    state.status === "open" &&
+    election.scheduledCloseAt &&
+    election.scheduledCloseAt <= now
+  ) {
+    await transitionElection({ electionId, status: "closed", changedByAdminId: null });
+  }
+}
+
+/**
+ * Applies pending scheduled transitions across all elections.
+ * Called from list/ballot-context routes to ensure schedules fire even when
+ * the admin isn't actively viewing a specific election.
+ */
+export async function applyPendingSchedules(): Promise<void> {
+  const now = new Date();
+  const candidates = await db.election.findMany({
+    where: {
+      OR: [
+        { scheduledOpenAt: { lte: now } },
+        { scheduledCloseAt: { lte: now } },
+      ],
+    },
+    select: { id: true },
+  });
+  for (const { id } of candidates) {
+    await applySchedule(id);
+  }
 }
 
 /**

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireVoter } from "@/lib/auth-guards";
 import { getRevokedIds, isRevoked } from "@/lib/revocation";
-import { findElectionIdsByStatus } from "@/lib/election-state";
+import { applyPendingSchedules, findElectionIdsByStatus } from "@/lib/election-state";
 import { decryptVoterFields } from "@/lib/voter-pii";
 
 export async function GET() {
@@ -21,6 +21,9 @@ export async function GET() {
     return NextResponse.json({ error: "Voter not found" }, { status: 404 });
   }
   const voter = decryptVoterFields(voterRow);
+
+  // Apply any pending scheduled transitions before checking for open elections
+  await applyPendingSchedules();
 
   // Find currently-open elections via the event log
   const openIds = await findElectionIdsByStatus("open");

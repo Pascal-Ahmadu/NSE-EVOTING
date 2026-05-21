@@ -43,6 +43,8 @@ interface ElectionDetail {
   status: ElectionStatus;
   openedAt: string | null;
   closedAt: string | null;
+  scheduledOpenAt: string | null;
+  scheduledCloseAt: string | null;
   ballotCount: number;
   positions: PositionView[];
   tally: PositionTallyView[];
@@ -91,6 +93,12 @@ export default function ElectionDetailPage() {
   const [statusError, setStatusError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<ConfirmTarget | null>(null);
 
+  const [scheduleOpenAt, setScheduleOpenAt] = useState("");
+  const [scheduleCloseAt, setScheduleCloseAt] = useState("");
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [now, setNow] = useState(() => new Date());
+
   const refresh = useCallback(async () => {
     const result = await apiCall<{ election: ElectionDetail }>(
       `/api/elections/${electionId}`,
@@ -115,6 +123,27 @@ export default function ElectionDetailPage() {
     refresh();
     refreshVoters();
   }, [refresh, refreshVoters]);
+
+  // Sync schedule inputs when election data loads
+  useEffect(() => {
+    if (!election) return;
+    setScheduleOpenAt(
+      election.scheduledOpenAt
+        ? toDatetimeLocal(election.scheduledOpenAt)
+        : "",
+    );
+    setScheduleCloseAt(
+      election.scheduledCloseAt
+        ? toDatetimeLocal(election.scheduledCloseAt)
+        : "",
+    );
+  }, [election]);
+
+  // Tick every second for countdown display
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const isDraft = election?.status === "draft";
   const isOpen = election?.status === "open";
@@ -271,6 +300,50 @@ export default function ElectionDetailPage() {
     refresh();
   };
 
+  const handleSaveSchedule = async () => {
+    if (scheduleOpenAt && scheduleCloseAt) {
+      if (new Date(scheduleOpenAt) >= new Date(scheduleCloseAt)) {
+        setScheduleError("Close time must be after open time.");
+        return;
+      }
+    }
+    setScheduleSaving(true);
+    setScheduleError(null);
+    const result = await apiCall<{ ok: true }>(
+      `/api/elections/${electionId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          scheduledOpenAt: scheduleOpenAt ? new Date(scheduleOpenAt).toISOString() : null,
+          scheduledCloseAt: scheduleCloseAt ? new Date(scheduleCloseAt).toISOString() : null,
+        }),
+      },
+    );
+    setScheduleSaving(false);
+    if (!result.ok) {
+      setScheduleError(result.error);
+      return;
+    }
+    refresh();
+  };
+
+  const handleClearSchedule = async () => {
+    setScheduleSaving(true);
+    setScheduleError(null);
+    await apiCall<{ ok: true }>(`/api/elections/${electionId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ scheduledOpenAt: null, scheduledCloseAt: null }),
+    });
+    setScheduleSaving(false);
+    setScheduleOpenAt("");
+    setScheduleCloseAt("");
+    refresh();
+  };
+
+  const hasSchedule =
+    election &&
+    (election.scheduledOpenAt || election.scheduledCloseAt);
+
   if (election === undefined) {
     return <ElectionDetailSkeleton />;
   }
@@ -375,6 +448,106 @@ export default function ElectionDetailPage() {
           </p>
         )}
       </header>
+
+      {(isDraft || isOpen) && (
+        <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-800">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Schedule
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {isDraft
+              ? "Optionally set a time to auto-open and auto-close this election. Times are in your local timezone."
+              : "Update the scheduled close time. The election is already open."}
+          </p>
+
+          {hasSchedule && (
+            <div className="mt-4 flex flex-wrap gap-4 rounded-xl border border-brand-200 bg-brand-50/40 p-4 dark:border-brand-800/40 dark:bg-brand-900/10">
+              {election.scheduledOpenAt && isDraft && (
+                <ScheduleCountdown
+                  label="Opens in"
+                  target={election.scheduledOpenAt}
+                  now={now}
+                />
+              )}
+              {election.scheduledCloseAt && (
+                <ScheduleCountdown
+                  label={isOpen ? "Closes in" : "Scheduled close"}
+                  target={election.scheduledCloseAt}
+                  now={now}
+                />
+              )}
+            </div>
+          )}
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            {isDraft && (
+              <div>
+                <label
+                  htmlFor="sched-open"
+                  className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  Open at
+                </label>
+                <input
+                  id="sched-open"
+                  type="datetime-local"
+                  value={scheduleOpenAt}
+                  onChange={(e) => {
+                    setScheduleOpenAt(e.target.value);
+                    if (scheduleError) setScheduleError(null);
+                  }}
+                  className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                />
+              </div>
+            )}
+            <div>
+              <label
+                htmlFor="sched-close"
+                className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                Close at
+              </label>
+              <input
+                id="sched-close"
+                type="datetime-local"
+                value={scheduleCloseAt}
+                onChange={(e) => {
+                  setScheduleCloseAt(e.target.value);
+                  if (scheduleError) setScheduleError(null);
+                }}
+                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+              />
+            </div>
+          </div>
+
+          {scheduleError && (
+            <p role="alert" className="mt-2 text-sm text-error-500">
+              {scheduleError}
+            </p>
+          )}
+
+          <div className="mt-4 flex gap-2">
+            {hasSchedule && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClearSchedule}
+                disabled={scheduleSaving}
+              >
+                Clear schedule
+              </Button>
+            )}
+            <Button
+              size="sm"
+              onClick={handleSaveSchedule}
+              loading={scheduleSaving}
+              disabled={!scheduleOpenAt && !scheduleCloseAt && !hasSchedule}
+            >
+              {scheduleSaving ? "Saving…" : "Save schedule"}
+            </Button>
+          </div>
+        </section>
+      )}
 
       {isDraft && (
         <section id="tour-add-position-section" className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-800">
@@ -696,6 +869,54 @@ export default function ElectionDetailPage() {
           </Button>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+function toDatetimeLocal(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function formatCountdown(target: Date, now: Date): string {
+  const diff = target.getTime() - now.getTime();
+  if (diff <= 0) return "now";
+  const s = Math.floor(diff / 1000);
+  const m = Math.floor(s / 60);
+  const h = Math.floor(m / 60);
+  const d = Math.floor(h / 24);
+  if (d > 0) return `${d}d ${h % 24}h`;
+  if (h > 0) return `${h}h ${m % 60}m`;
+  if (m > 0) return `${m}m ${s % 60}s`;
+  return `${s}s`;
+}
+
+function ScheduleCountdown({
+  label,
+  target,
+  now,
+}: {
+  label: string;
+  target: string;
+  now: Date;
+}) {
+  const t = new Date(target);
+  const isPast = t <= now;
+  return (
+    <div>
+      <p className="text-xs font-medium uppercase tracking-wide text-brand-600 dark:text-brand-400">
+        {label}
+      </p>
+      <p className="text-sm font-semibold text-gray-900 dark:text-white">
+        {isPast ? "Processing…" : formatCountdown(t, now)}
+      </p>
+      <p className="text-xs text-gray-500 dark:text-gray-400">
+        {t.toLocaleString(undefined, {
+          dateStyle: "medium",
+          timeStyle: "short",
+        })}
+      </p>
     </div>
   );
 }

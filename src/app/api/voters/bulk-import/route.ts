@@ -1,0 +1,210 @@
+import { NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth-guards";
+import { requireSameOrigin } from "@/lib/csrf";
+import { audit, requestMeta } from "@/lib/audit";
+import { hashPII } from "@/lib/pii";
+import { hashSecret } from "@/lib/password";
+import { encryptVoter } from "@/lib/voter-pii";
+import { generateVoterId, generatePassword } from "@/lib/voter-codegen";
+import { Prisma } from "@prisma/client";
+
+interface ImportedVoter {
+  name: string;
+  email: string;
+  voterId: string;
+  password: string;
+}
+
+interface SkippedRow {
+  row: number;
+  name: string;
+  email: string;
+  reason: string;
+}
+
+function parseCSV(text: string): { name: string; email: string }[] {
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  if (lines.length < 2) return [];
+
+  // Detect header: first row must have "name" and "email" columns
+  const header = lines[0]!
+    .toLowerCase()
+    .split(",")
+    .map((h) => h.trim().replace(/^"|"$/g, ""));
+  const nameIdx = header.indexOf("name");
+  const emailIdx = header.indexOf("email");
+  if (nameIdx === -1 || emailIdx === -1) return [];
+
+  const rows: { name: string; email: string }[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    // Simple CSV split — handles quoted fields
+    const cols = splitCSVLine(lines[i]!);
+    const name = (cols[nameIdx] ?? "").trim();
+    const email = (cols[emailIdx] ?? "").trim().toLowerCase();
+    if (name || email) rows.push({ name, email });
+  }
+  return rows;
+}
+
+function splitCSVLine(line: string): string[] {
+  const cols: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (const ch of line) {
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+    } else if (ch === "," && !inQuotes) {
+      cols.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  cols.push(current);
+  return cols;
+}
+
+async function makeUniqueVoterId(existingHashes: Set<string>): Promise<string | null> {
+  for (let i = 0; i < 50; i++) {
+    const id = generateVoterId();
+    const hash = hashPII(id);
+    if (existingHashes.has(hash)) continue;
+    const inDb = await db.voter.findUnique({
+      where: { voterIdHash: hash },
+      select: { id: true },
+    });
+    if (!inDb) {
+      existingHashes.add(hash);
+      return id;
+    }
+  }
+  return null;
+}
+
+export async function POST(req: Request) {
+  const csrf = requireSameOrigin(req);
+  if (csrf) return csrf;
+
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard.response;
+
+  let formData: FormData;
+  try {
+    formData = await req.formData();
+  } catch {
+    return NextResponse.json({ error: "Expected multipart form data" }, { status: 400 });
+  }
+
+  const file = formData.get("file");
+  if (!file || typeof file === "string") {
+    return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+  }
+
+  const text = await (file as File).text();
+  const rows = parseCSV(text);
+
+  if (rows.length === 0) {
+    return NextResponse.json(
+      { error: 'CSV must have a header row with "name" and "email" columns, plus at least one data row.' },
+      { status: 400 },
+    );
+  }
+  if (rows.length > 200) {
+    return NextResponse.json(
+      { error: "Maximum 200 voters per import batch." },
+      { status: 400 },
+    );
+  }
+
+  const created: ImportedVoter[] = [];
+  const skipped: SkippedRow[] = [];
+
+  // Track voter ID hashes assigned in this batch to avoid duplicates within the batch
+  const batchVoterIdHashes = new Set<string>();
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]!;
+    const rowNum = i + 2; // 1-indexed, skipping header
+
+    if (!row.name) {
+      skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "Name is required" });
+      continue;
+    }
+    if (!row.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) {
+      skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "Invalid email" });
+      continue;
+    }
+
+    const emailHash = hashPII(row.email);
+    const existingByEmail = await db.voter.findUnique({
+      where: { emailHash },
+      select: { id: true },
+    });
+    if (existingByEmail) {
+      skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "Email already registered" });
+      continue;
+    }
+
+    const voterId = await makeUniqueVoterId(batchVoterIdHashes);
+    if (!voterId) {
+      skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "Could not generate unique Voter ID" });
+      continue;
+    }
+
+    const password = generatePassword();
+    const voterIdHash = hashPII(voterId);
+    const encrypted = encryptVoter({ name: row.name, email: row.email, voterId });
+
+    try {
+      await db.voter.create({
+        data: {
+          ...encrypted,
+          passwordHash: await hashSecret(password),
+        },
+      });
+      created.push({ name: row.name, email: row.email, voterId, password });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002"
+      ) {
+        const fields = (err.meta?.target as string[] | undefined) ?? [];
+        const reason = fields.includes("emailHash")
+          ? "Email already registered"
+          : fields.includes("voterIdHash")
+            ? "Voter ID collision — retry the import"
+            : "Duplicate record";
+        skipped.push({ row: rowNum, name: row.name, email: row.email, reason });
+        // Remove the reserved voter ID hash if the insert failed
+        batchVoterIdHashes.delete(voterIdHash);
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  if (created.length > 0) {
+    const admin = await db.admin.findUnique({
+      where: { id: guard.value.adminId },
+      select: { email: true },
+    });
+    const meta = requestMeta(req);
+    await audit({
+      actorType: "admin",
+      actorId: guard.value.adminId,
+      actorLabel: admin?.email ?? null,
+      action: "voter.bulk_import",
+      targetType: "voter",
+      targetId: null,
+      details: { count: created.length, skipped: skipped.length },
+      meta,
+    });
+  }
+
+  return NextResponse.json({ created, skipped }, { status: 201 });
+}

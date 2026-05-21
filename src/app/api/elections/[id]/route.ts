@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-guards";
 import { requireSameOrigin } from "@/lib/csrf";
 import { audit, requestMeta } from "@/lib/audit";
 import { isRevoked, revoke, getRevokedIds } from "@/lib/revocation";
-import { getElectionState } from "@/lib/election-state";
+import { applySchedule, getElectionState } from "@/lib/election-state";
+import { parseJson } from "@/lib/zod-helpers";
 
 export async function GET(
   _req: Request,
@@ -17,6 +19,9 @@ export async function GET(
   if (await isRevoked("election", id)) {
     return NextResponse.json({ error: "Election not found" }, { status: 404 });
   }
+  // Apply any pending schedule before reading state (lazy scheduler)
+  await applySchedule(id);
+
   const election = await db.election.findUnique({
     where: { id },
     select: {
@@ -24,6 +29,8 @@ export async function GET(
       name: true,
       description: true,
       createdAt: true,
+      scheduledOpenAt: true,
+      scheduledCloseAt: true,
       positions: {
         orderBy: { createdAt: "asc" },
         select: {
@@ -99,6 +106,8 @@ export async function GET(
       createdAt: election.createdAt.toISOString(),
       openedAt: state.openedAt?.toISOString() ?? null,
       closedAt: state.closedAt?.toISOString() ?? null,
+      scheduledOpenAt: election.scheduledOpenAt?.toISOString() ?? null,
+      scheduledCloseAt: election.scheduledCloseAt?.toISOString() ?? null,
       ballotCount: election._count.ballots,
       positions: positions.map((p) => ({
         id: p.id,
@@ -166,6 +175,79 @@ export async function DELETE(
     details: { name: election.name },
     ip: meta.ip,
     userAgent: meta.userAgent,
+  });
+
+  return NextResponse.json({ ok: true });
+}
+
+const ScheduleBody = z.object({
+  scheduledOpenAt: z.string().datetime({ offset: true }).nullable().optional(),
+  scheduledCloseAt: z.string().datetime({ offset: true }).nullable().optional(),
+});
+
+export async function PATCH(
+  req: Request,
+  ctx: { params: Promise<{ id: string }> },
+) {
+  const csrf = requireSameOrigin(req);
+  if (csrf) return csrf;
+
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard.response;
+
+  const { id } = await ctx.params;
+  if (await isRevoked("election", id)) {
+    return NextResponse.json({ error: "Election not found" }, { status: 404 });
+  }
+  const election = await db.election.findUnique({
+    where: { id },
+    select: { name: true },
+  });
+  if (!election) {
+    return NextResponse.json({ error: "Election not found" }, { status: 404 });
+  }
+
+  const parsed = await parseJson(req, ScheduleBody);
+  if (!parsed.ok) return parsed.response;
+  const { scheduledOpenAt, scheduledCloseAt } = parsed.data;
+
+  if (
+    scheduledOpenAt &&
+    scheduledCloseAt &&
+    new Date(scheduledOpenAt) >= new Date(scheduledCloseAt)
+  ) {
+    return NextResponse.json(
+      { error: "Close time must be after open time" },
+      { status: 400 },
+    );
+  }
+
+  await db.election.update({
+    where: { id },
+    data: {
+      ...(scheduledOpenAt !== undefined && {
+        scheduledOpenAt: scheduledOpenAt ? new Date(scheduledOpenAt) : null,
+      }),
+      ...(scheduledCloseAt !== undefined && {
+        scheduledCloseAt: scheduledCloseAt ? new Date(scheduledCloseAt) : null,
+      }),
+    },
+  });
+
+  const admin = await db.admin.findUnique({
+    where: { id: guard.value.adminId },
+    select: { email: true },
+  });
+  const meta = requestMeta(req);
+  await audit({
+    actorType: "admin",
+    actorId: guard.value.adminId,
+    actorLabel: admin?.email ?? null,
+    action: "election.schedule",
+    targetType: "election",
+    targetId: id,
+    details: { scheduledOpenAt: scheduledOpenAt ?? null, scheduledCloseAt: scheduledCloseAt ?? null },
+    meta,
   });
 
   return NextResponse.json({ ok: true });

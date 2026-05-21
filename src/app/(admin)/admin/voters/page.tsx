@@ -37,6 +37,20 @@ interface VoterCredentials {
   password: string;
 }
 
+interface BulkImportRow {
+  name: string;
+  email: string;
+  voterId: string;
+  password: string;
+}
+
+interface SkippedRow {
+  row: number;
+  name: string;
+  email: string;
+  reason: string;
+}
+
 interface VoterForm {
   name: string;
   email: string;
@@ -65,7 +79,9 @@ const formatDate = (iso: string): string =>
 type ModalView =
   | { kind: "closed" }
   | { kind: "form" }
-  | { kind: "success"; voter: VoterCredentials };
+  | { kind: "success"; voter: VoterCredentials }
+  | { kind: "import" }
+  | { kind: "import-results"; created: BulkImportRow[]; skipped: SkippedRow[] };
 
 export default function VotersPage() {
   const [page, setPage] = useState<VotersPage | null>(null);
@@ -79,6 +95,9 @@ export default function VotersPage() {
   const [resetting, setResetting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
 
   const refresh = useCallback(async (currentPage: number, q: string) => {
     setLoading(true);
@@ -110,12 +129,67 @@ export default function VotersPage() {
     setForm(EMPTY_FORM);
     setErrors({});
     setCopied(false);
+    setImportFile(null);
+    setImportError(null);
   };
 
   const openForm = () => {
     setForm(EMPTY_FORM);
     setErrors({});
     setView({ kind: "form" });
+  };
+
+  const openImport = () => {
+    setImportFile(null);
+    setImportError(null);
+    setView({ kind: "import" });
+  };
+
+  const handleImport = async () => {
+    if (!importFile) {
+      setImportError("Please select a CSV file.");
+      return;
+    }
+    setImportLoading(true);
+    setImportError(null);
+    const body = new FormData();
+    body.append("file", importFile);
+    const result = await apiCall<{ created: BulkImportRow[]; skipped: SkippedRow[] }>(
+      "/api/voters/bulk-import",
+      { method: "POST", body },
+    );
+    setImportLoading(false);
+    if (!result.ok) {
+      setImportError(result.error);
+      return;
+    }
+    if (result.data.created.length === 0) {
+      setImportError(
+        "No voters were imported. " +
+        (result.data.skipped.length > 0
+          ? `All ${result.data.skipped.length} rows were skipped.`
+          : "The file may be empty or formatted incorrectly."),
+      );
+      return;
+    }
+    setView({ kind: "import-results", created: result.data.created, skipped: result.data.skipped });
+    refresh(pageNum, filter.trim());
+  };
+
+  const downloadCredentialsCSV = (voters: BulkImportRow[]) => {
+    const header = "Name,Email,Voter ID,Password";
+    const rows = voters.map(
+      (v) =>
+        `"${v.name.replace(/"/g, '""')}","${v.email}","${v.voterId}","${v.password}"`,
+    );
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "voter-credentials.csv";
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleAutoGenerateId = async () => {
@@ -244,11 +318,16 @@ export default function VotersPage() {
             Only registered voters can sign in to cast a ballot.
           </p>
         </div>
-        <span id="tour-voters-register-btn">
-          <Button startIcon={<PlusIcon />} onClick={openForm}>
-            Register voter
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={openImport}>
+            Import CSV
           </Button>
-        </span>
+          <span id="tour-voters-register-btn">
+            <Button startIcon={<PlusIcon />} onClick={openForm}>
+              Register voter
+            </Button>
+          </span>
+        </div>
       </header>
 
       {page.total === 0 && !filter ? (
@@ -259,7 +338,10 @@ export default function VotersPage() {
           <p className="mx-auto mt-1 max-w-sm text-sm text-gray-500 dark:text-gray-400">
             Register at least one voter before opening an election.
           </p>
-          <div className="mt-5">
+          <div className="mt-5 flex justify-center gap-3">
+            <Button variant="outline" onClick={openImport}>
+              Import CSV
+            </Button>
             <Button startIcon={<PlusIcon />} onClick={openForm}>
               Register first voter
             </Button>
@@ -518,6 +600,139 @@ export default function VotersPage() {
                 onClick={() => handleCopyCredentials(view.voter)}
               >
                 {copied ? "Copied" : "Copy credentials"}
+              </Button>
+              <Button size="sm" onClick={closeModal}>
+                Done
+              </Button>
+            </div>
+          </>
+        )}
+
+        {view.kind === "import" && (
+          <>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Import voters from CSV
+            </h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Upload a CSV file with a <code className="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">name</code> and <code className="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">email</code> column. Voter IDs and passwords are generated automatically.
+            </p>
+            <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-800/40 dark:text-gray-400">
+              <p className="font-medium text-gray-700 dark:text-gray-300">Expected CSV format:</p>
+              <pre className="mt-1 font-mono">name,email{"\n"}Ada Lovelace,ada@example.com{"\n"}Alan Turing,alan@example.com</pre>
+              <p className="mt-2">Maximum 200 rows per import.</p>
+            </div>
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                CSV file
+              </label>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(e) => {
+                  setImportFile(e.target.files?.[0] ?? null);
+                  if (importError) setImportError(null);
+                }}
+                className="block w-full text-sm text-gray-700 dark:text-gray-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 dark:file:bg-brand-900/30 dark:file:text-brand-400"
+              />
+            </div>
+            {importError && (
+              <div role="alert" className="mt-3 rounded-lg border border-error-500/30 bg-error-500/5 px-3 py-2 text-sm text-error-600 dark:text-error-400">
+                {importError}
+              </div>
+            )}
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={closeModal}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleImport} loading={importLoading} disabled={!importFile}>
+                {importLoading ? "Importing…" : "Import"}
+              </Button>
+            </div>
+          </>
+        )}
+
+        {view.kind === "import-results" && (
+          <>
+            <div className="mb-4 flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-success-500/10 text-success-500">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {view.created.length} voter{view.created.length === 1 ? "" : "s"} imported
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Download the credentials and share with each voter.
+                  {view.skipped.length > 0 && ` ${view.skipped.length} row${view.skipped.length === 1 ? " was" : "s were"} skipped.`}
+                </p>
+              </div>
+            </div>
+
+            <div className="max-h-64 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-700">
+              <table className="min-w-full text-xs">
+                <thead className="sticky top-0 bg-gray-50 dark:bg-gray-800 text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">Name</th>
+                    <th className="px-3 py-2 font-medium">Email</th>
+                    <th className="px-3 py-2 font-medium">Voter ID</th>
+                    <th className="px-3 py-2 font-medium">Password</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {view.created.map((v, i) => (
+                    <tr key={i} className="text-gray-700 dark:text-gray-300">
+                      <td className="px-3 py-2">{v.name}</td>
+                      <td className="px-3 py-2">{v.email}</td>
+                      <td className="px-3 py-2 font-mono text-brand-500">{v.voterId}</td>
+                      <td className="px-3 py-2 font-mono">{v.password}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {view.skipped.length > 0 && (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                  {view.skipped.length} skipped row{view.skipped.length === 1 ? "" : "s"}
+                </summary>
+                <div className="mt-2 max-h-32 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                  <table className="min-w-full text-xs">
+                    <thead className="bg-gray-50 dark:bg-gray-800 text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      <tr>
+                        <th className="px-3 py-2">Row</th>
+                        <th className="px-3 py-2">Name</th>
+                        <th className="px-3 py-2">Email</th>
+                        <th className="px-3 py-2">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700 text-gray-600 dark:text-gray-400">
+                      {view.skipped.map((s, i) => (
+                        <tr key={i}>
+                          <td className="px-3 py-1.5">{s.row}</td>
+                          <td className="px-3 py-1.5">{s.name}</td>
+                          <td className="px-3 py-1.5">{s.email}</td>
+                          <td className="px-3 py-1.5 text-error-500">{s.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            )}
+
+            <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+              Passwords are shown only once — download the CSV and distribute credentials before closing this window.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => downloadCredentialsCSV(view.created)}
+              >
+                Download CSV
               </Button>
               <Button size="sm" onClick={closeModal}>
                 Done

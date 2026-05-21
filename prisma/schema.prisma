@@ -73,13 +73,17 @@ model VoterCredential {
 
 /// One of: "draft" | "open" | "closed". Validated in the service layer.
 model Election {
-  id          String    @id @default(cuid())
-  name        String
-  description String?
-  status      String    @default("draft")
-  createdAt   DateTime  @default(now())
-  openedAt    DateTime?
-  closedAt    DateTime?
+  id               String    @id @default(cuid())
+  name             String
+  description      String?
+  status           String    @default("draft")
+  createdAt        DateTime  @default(now())
+  openedAt         DateTime?
+  closedAt         DateTime?
+  /// Optional: auto-open the election at this UTC time (lazy — applied on next API read).
+  scheduledOpenAt  DateTime?
+  /// Optional: auto-close the election at this UTC time (lazy — applied on next API read).
+  scheduledCloseAt DateTime?
 
   positions     Position[]
   ballots       Ballot[]

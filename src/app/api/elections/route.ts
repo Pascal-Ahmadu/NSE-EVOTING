@@ -7,7 +7,7 @@ import { audit, requestMeta } from "@/lib/audit";
 import { buildPage, parsePageParams } from "@/lib/pagination";
 import { Title, Description, parseJson } from "@/lib/zod-helpers";
 import { getRevokedIds } from "@/lib/revocation";
-import { getElectionStates } from "@/lib/election-state";
+import { applyPendingSchedules, getElectionStates } from "@/lib/election-state";
 
 const CreateBody = z.object({
   name: Title,
@@ -17,6 +17,8 @@ const CreateBody = z.object({
 export async function GET(req: Request) {
   const guard = await requireAdmin();
   if (!guard.ok) return guard.response;
+
+  await applyPendingSchedules();
 
   const url = new URL(req.url);
   const params = parsePageParams(url.searchParams);
