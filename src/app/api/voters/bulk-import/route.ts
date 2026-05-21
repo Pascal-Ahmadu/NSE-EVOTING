@@ -23,7 +23,7 @@ interface SkippedRow {
   reason: string;
 }
 
-function parseCSV(text: string): { name: string; email: string }[] {
+function parseCSV(text: string): { name: string; email: string; voterId: string }[] {
   const lines = text
     .split(/\r?\n/)
     .map((l) => l.trim())
@@ -31,22 +31,26 @@ function parseCSV(text: string): { name: string; email: string }[] {
 
   if (lines.length < 2) return [];
 
-  // Detect header: first row must have "name" and "email" columns
+  // Detect header: first row must have "name" and "email" columns; "voter_id" / "voterid" / "voter id" is optional
   const header = lines[0]!
     .toLowerCase()
     .split(",")
-    .map((h) => h.trim().replace(/^"|"$/g, ""));
+    .map((h) => h.trim().replace(/^"|"$/g, "").replace(/[\s_]/g, ""));
   const nameIdx = header.indexOf("name");
   const emailIdx = header.indexOf("email");
+  const voterIdIdx = ["voterid", "voter_id", "id"].reduce<number>(
+    (found, key) => (found === -1 ? header.indexOf(key) : found),
+    -1,
+  );
   if (nameIdx === -1 || emailIdx === -1) return [];
 
-  const rows: { name: string; email: string }[] = [];
+  const rows: { name: string; email: string; voterId: string }[] = [];
   for (let i = 1; i < lines.length; i++) {
-    // Simple CSV split — handles quoted fields
     const cols = splitCSVLine(lines[i]!);
     const name = (cols[nameIdx] ?? "").trim();
     const email = (cols[emailIdx] ?? "").trim().toLowerCase();
-    if (name || email) rows.push({ name, email });
+    const voterId = voterIdIdx !== -1 ? (cols[voterIdIdx] ?? "").trim().toUpperCase() : "";
+    if (name || email) rows.push({ name, email, voterId });
   }
   return rows;
 }
@@ -150,10 +154,32 @@ export async function POST(req: Request) {
       continue;
     }
 
-    const voterId = await makeUniqueVoterId(batchVoterIdHashes);
-    if (!voterId) {
-      skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "Could not generate unique Voter ID" });
-      continue;
+    let voterId: string;
+    if (row.voterId) {
+      // Validate format: 4–32 alphanumeric/dash characters
+      if (!/^[A-Z0-9-]{4,32}$/.test(row.voterId)) {
+        skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "Invalid Voter ID format (4–32 letters, numbers or dashes)" });
+        continue;
+      }
+      const hash = hashPII(row.voterId);
+      if (batchVoterIdHashes.has(hash)) {
+        skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "Duplicate Voter ID in this file" });
+        continue;
+      }
+      const inDb = await db.voter.findUnique({ where: { voterIdHash: hash }, select: { id: true } });
+      if (inDb) {
+        skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "Voter ID already registered" });
+        continue;
+      }
+      batchVoterIdHashes.add(hash);
+      voterId = row.voterId;
+    } else {
+      const generated = await makeUniqueVoterId(batchVoterIdHashes);
+      if (!generated) {
+        skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "Could not generate unique Voter ID" });
+        continue;
+      }
+      voterId = generated;
     }
 
     const password = generatePassword();

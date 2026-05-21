@@ -618,8 +618,8 @@ export default function VotersPage() {
             </p>
             <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-800/40 dark:text-gray-400">
               <p className="font-medium text-gray-700 dark:text-gray-300">Expected CSV format:</p>
-              <pre className="mt-1 font-mono">name,email{"\n"}Ada Lovelace,ada@example.com{"\n"}Alan Turing,alan@example.com</pre>
-              <p className="mt-2">Maximum 200 rows per import.</p>
+              <pre className="mt-1 font-mono">{"name,email,voter_id\nAda Lovelace,ada@example.com,VMK-0001\nAlan Turing,alan@example.com,"}</pre>
+              <p className="mt-2">The <code className="font-mono bg-gray-100 dark:bg-gray-800 px-1 rounded">voter_id</code> column is optional — leave it blank to auto-generate. Maximum 200 rows per import.</p>
             </div>
             <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
