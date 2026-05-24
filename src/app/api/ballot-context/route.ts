@@ -50,7 +50,7 @@ export async function GET() {
               description: true,
               candidates: {
                 orderBy: { createdAt: "asc" },
-                select: { id: true, name: true, bio: true },
+                select: { id: true, name: true, bio: true, photoUrl: true },
               },
             },
           },

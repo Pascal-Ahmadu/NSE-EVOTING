@@ -21,6 +21,7 @@ interface CandidateView {
   name: string;
   bio: string | null;
   voterRef: string | null;
+  photoUrl: string | null;
 }
 
 interface PositionView {
@@ -243,6 +244,26 @@ export default function ElectionDetailPage() {
       return next;
     });
     refresh();
+  };
+
+  const handleUploadPhoto = async (candidateId: string, file: File) => {
+    const body = new FormData();
+    body.append("photo", file);
+    const result = await apiCall<{ photoUrl: string }>(
+      `/api/candidates/${candidateId}/photo`,
+      { method: "POST", body },
+    );
+    if (result.ok) refresh();
+    else setStatusError(result.error);
+  };
+
+  const handleRemovePhoto = async (candidateId: string) => {
+    const result = await apiCall<{ ok: true }>(
+      `/api/candidates/${candidateId}/photo`,
+      { method: "DELETE" },
+    );
+    if (result.ok) refresh();
+    else setStatusError(result.error);
   };
 
   const handleConfirm = async () => {
@@ -664,31 +685,80 @@ export default function ElectionDetailPage() {
                           key={candidate.id}
                           className="flex items-start justify-between gap-4 py-3"
                         >
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="font-medium text-gray-800 dark:text-gray-100">
-                                {candidate.name}
-                              </p>
-                              {candidate.voterRef && (
-                                <span
-                                  className="rounded-full bg-brand-500/10 px-2 py-0.5 text-xs font-medium text-brand-500"
-                                  title={
-                                    linkedVoter
-                                      ? `Linked to voter ${linkedVoter.email}`
-                                      : "Linked voter no longer registered"
-                                  }
+                          <div className="flex items-start gap-3">
+                            {/* Photo thumbnail / upload zone */}
+                            {isDraft ? (
+                              <label
+                                title="Click to upload photo"
+                                className="relative h-12 w-12 shrink-0 cursor-pointer overflow-hidden rounded-full border-2 border-dashed border-gray-300 bg-gray-50 hover:border-brand-400 dark:border-gray-600 dark:bg-gray-800"
+                              >
+                                {candidate.photoUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={candidate.photoUrl}
+                                    alt={candidate.name}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <span className="flex h-full w-full items-center justify-center text-xs text-gray-400">
+                                    Photo
+                                  </span>
+                                )}
+                                <input
+                                  type="file"
+                                  accept="image/jpeg,image/png,image/webp"
+                                  className="sr-only"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) void handleUploadPhoto(candidate.id, file);
+                                    e.target.value = "";
+                                  }}
+                                />
+                              </label>
+                            ) : candidate.photoUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={candidate.photoUrl}
+                                alt={candidate.name}
+                                className="h-12 w-12 shrink-0 rounded-full object-cover ring-1 ring-gray-200 dark:ring-gray-700"
+                              />
+                            ) : null}
+
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="font-medium text-gray-800 dark:text-gray-100">
+                                  {candidate.name}
+                                </p>
+                                {candidate.voterRef && (
+                                  <span
+                                    className="rounded-full bg-brand-500/10 px-2 py-0.5 text-xs font-medium text-brand-500"
+                                    title={
+                                      linkedVoter
+                                        ? `Linked to voter ${linkedVoter.email}`
+                                        : "Linked voter no longer registered"
+                                    }
+                                  >
+                                    {linkedVoter
+                                      ? `Voter · ${linkedVoter.voterId}`
+                                      : "Linked voter removed"}
+                                  </span>
+                                )}
+                              </div>
+                              {candidate.bio && (
+                                <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+                                  {candidate.bio}
+                                </p>
+                              )}
+                              {isDraft && candidate.photoUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => void handleRemovePhoto(candidate.id)}
+                                  className="mt-1 text-xs text-error-500 hover:text-error-600"
                                 >
-                                  {linkedVoter
-                                    ? `Voter · ${linkedVoter.voterId}`
-                                    : "Linked voter removed"}
-                                </span>
+                                  Remove photo
+                                </button>
                               )}
                             </div>
-                            {candidate.bio && (
-                              <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-                                {candidate.bio}
-                              </p>
-                            )}
                           </div>
                           {isDraft && (
                             <Button

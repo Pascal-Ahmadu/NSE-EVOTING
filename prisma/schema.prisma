@@ -146,6 +146,7 @@ model Candidate {
   name       String
   bio        String?
   voterRef   String?
+  photoUrl   String?
   createdAt  DateTime @default(now())
 
   position Position       @relation(fields: [positionId], references: [id], onDelete: Cascade)

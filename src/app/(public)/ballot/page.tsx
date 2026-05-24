@@ -18,6 +18,7 @@ interface CandidateView {
   id: string;
   name: string;
   bio: string | null;
+  photoUrl: string | null;
 }
 
 interface PositionView {
@@ -250,6 +251,14 @@ export default function BallotPage() {
                         >
                           {selected && <span className="h-3 w-3 rounded-full bg-white" />}
                         </span>
+                        {candidate.photoUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={candidate.photoUrl}
+                            alt={candidate.name}
+                            className="h-14 w-14 shrink-0 rounded-full object-cover ring-2 ring-gray-200 dark:ring-gray-700"
+                          />
+                        )}
                         <span className="flex-1">
                           <span className="block text-lg font-semibold text-gray-900 dark:text-white">
                             {candidate.name}
