@@ -498,27 +498,18 @@ export default function VotersPage() {
                 />
               </div>
               <div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="new-voter-id">Voter ID</Label>
-                  <button
-                    type="button"
-                    onClick={handleAutoGenerateId}
-                    className="text-xs font-medium text-brand-500 hover:text-brand-600"
-                  >
-                    Auto-generate
-                  </button>
-                </div>
+                <Label htmlFor="new-voter-id">NSE Number (Voter ID)</Label>
                 <Input
                   id="new-voter-id"
                   type="text"
                   value={form.voterId}
                   onChange={(e) => setField("voterId", e.target.value)}
-                  placeholder="VMK-1234"
+                  placeholder="e.g. NSE12345"
                   autoComplete="off"
                   maxLength={32}
                   required
                   error={Boolean(errors.voterId)}
-                  hint={errors.voterId ?? "4–32 letters, numbers or dashes"}
+                  hint={errors.voterId ?? "The member's NSE membership number"}
                 />
               </div>
               <div>
@@ -618,8 +609,8 @@ export default function VotersPage() {
             </p>
             <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-800/40 dark:text-gray-400">
               <p className="font-medium text-gray-700 dark:text-gray-300">Expected CSV format:</p>
-              <pre className="mt-1 font-mono">{"name,email,voter_id\nAda Lovelace,ada@example.com,VMK-0001\nAlan Turing,alan@example.com,"}</pre>
-              <p className="mt-2">The <code className="font-mono bg-gray-100 dark:bg-gray-800 px-1 rounded">voter_id</code> column is optional — leave it blank to auto-generate. Maximum 200 rows per import.</p>
+              <pre className="mt-1 font-mono">{"name,email,voter_id\nAda Lovelace,ada@example.com,NSE12345\nAlan Turing,alan@example.com,NSE67890"}</pre>
+              <p className="mt-2">The <code className="font-mono bg-gray-100 dark:bg-gray-800 px-1 rounded">voter_id</code> column is required — use each member&apos;s NSE number. Maximum 200 rows per import.</p>
             </div>
             <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">

@@ -154,33 +154,27 @@ export async function POST(req: Request) {
       continue;
     }
 
-    let voterId: string;
-    if (row.voterId) {
-      // Validate format: 4–32 alphanumeric/dash characters
-      if (!/^[A-Z0-9-]{4,32}$/.test(row.voterId)) {
-        skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "Invalid Voter ID format (4–32 letters, numbers or dashes)" });
-        continue;
-      }
-      const hash = hashPII(row.voterId);
-      if (batchVoterIdHashes.has(hash)) {
-        skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "Duplicate Voter ID in this file" });
-        continue;
-      }
-      const inDb = await db.voter.findUnique({ where: { voterIdHash: hash }, select: { id: true } });
-      if (inDb) {
-        skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "Voter ID already registered" });
-        continue;
-      }
-      batchVoterIdHashes.add(hash);
-      voterId = row.voterId;
-    } else {
-      const generated = await makeUniqueVoterId(batchVoterIdHashes);
-      if (!generated) {
-        skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "Could not generate unique Voter ID" });
-        continue;
-      }
-      voterId = generated;
+    if (!row.voterId) {
+      skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "NSE number (voter_id) is required" });
+      continue;
     }
+    // Validate format: 4–32 alphanumeric/dash characters
+    if (!/^[A-Z0-9-]{4,32}$/.test(row.voterId)) {
+      skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "Invalid NSE number format (4–32 letters, numbers or dashes)" });
+      continue;
+    }
+    const voterIdHashCheck = hashPII(row.voterId);
+    if (batchVoterIdHashes.has(voterIdHashCheck)) {
+      skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "Duplicate NSE number in this file" });
+      continue;
+    }
+    const inDb = await db.voter.findUnique({ where: { voterIdHash: voterIdHashCheck }, select: { id: true } });
+    if (inDb) {
+      skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "NSE number already registered" });
+      continue;
+    }
+    batchVoterIdHashes.add(voterIdHashCheck);
+    const voterId = row.voterId;
 
     const password = generatePassword();
     const voterIdHash = hashPII(voterId);
