@@ -15,13 +15,16 @@ export async function apiCall<T>(
 ): Promise<ApiResult<T>> {
   let res: Response;
   try {
+    const isFormData = init?.body instanceof FormData;
     res = await fetch(url, {
       credentials: "same-origin",
       ...init,
-      headers: {
-        "Content-Type": "application/json",
-        ...(init?.headers ?? {}),
-      },
+      headers: isFormData
+        ? (init?.headers ?? {})
+        : {
+            "Content-Type": "application/json",
+            ...(init?.headers ?? {}),
+          },
     });
   } catch {
     return { ok: false, status: 0, error: "Network request failed" };
