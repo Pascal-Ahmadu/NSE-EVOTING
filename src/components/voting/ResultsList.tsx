@@ -16,12 +16,13 @@ export interface PositionTally {
 interface Props {
   tally: PositionTally[];
   topN?: number;
+  closed?: boolean;
 }
 
 const formatPct = (votes: number, total: number): string =>
   total === 0 ? "0%" : `${Math.round((votes / total) * 100)}%`;
 
-export default function ResultsList({ tally, topN }: Props) {
+export default function ResultsList({ tally, topN, closed }: Props) {
   if (tally.length === 0) {
     return (
       <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -51,7 +52,7 @@ export default function ResultsList({ tally, topN }: Props) {
               </div>
               {leader && totalVotes > 0 && (
                 <span className="rounded-full bg-success-500/10 px-2.5 py-1 text-xs font-medium text-success-600 dark:text-success-400">
-                  Leading: {leader.name}
+                  {closed ? "Winner" : "Leading"}: {leader.name}
                 </span>
               )}
             </header>

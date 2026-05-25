@@ -234,7 +234,7 @@ function ElectionSection({
                   </div>
                   {leader && tally.totalVotes > 0 && (
                     <span className="rounded-full bg-success-500/10 px-2.5 py-1 text-xs font-medium text-success-600 dark:text-success-400">
-                      Leading: {leader.name}
+                      {election.status === "closed" ? "Winner" : "Leading"}: {leader.name}
                     </span>
                   )}
                 </header>

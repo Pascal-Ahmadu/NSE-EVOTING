@@ -912,7 +912,7 @@ export default function ElectionDetailPage() {
               </button>
             )}
           </div>
-          <ResultsList tally={resultsListInput} />
+          <ResultsList tally={resultsListInput} closed={isClosed} />
         </section>
       )}
 
