@@ -13,7 +13,7 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "img-src 'self' data: blob:",
+      "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com",
       "style-src 'self' 'unsafe-inline'",
       // Next.js dev/runtime needs eval for HMR/server components serialization
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
