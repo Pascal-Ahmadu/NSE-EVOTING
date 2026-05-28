@@ -7,6 +7,7 @@ import { hashPII } from "@/lib/pii";
 import { hashSecret } from "@/lib/password";
 import { encryptVoter } from "@/lib/voter-pii";
 import { generateVoterId, generatePassword } from "@/lib/voter-codegen";
+import { getRevokedIds } from "@/lib/revocation";
 import { Prisma } from "@prisma/client";
 
 interface ImportedVoter {
@@ -128,6 +129,10 @@ export async function POST(req: Request) {
   const created: ImportedVoter[] = [];
   const skipped: SkippedRow[] = [];
 
+  // Exclude revoked (soft-deleted) voters from all duplicate checks so they can be re-registered.
+  const revokedIds = await getRevokedIds("voter");
+  const notRevoked = revokedIds.length > 0 ? { id: { notIn: revokedIds } } : {};
+
   // Track voter ID hashes assigned in this batch to avoid duplicates within the batch
   const batchVoterIdHashes = new Set<string>();
 
@@ -145,8 +150,8 @@ export async function POST(req: Request) {
     }
 
     const emailHash = hashPII(row.email);
-    const existingByEmail = await db.voter.findUnique({
-      where: { emailHash },
+    const existingByEmail = await db.voter.findFirst({
+      where: { emailHash, ...notRevoked },
       select: { id: true },
     });
     if (existingByEmail) {
@@ -168,7 +173,7 @@ export async function POST(req: Request) {
       skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "Duplicate NSE number in this file" });
       continue;
     }
-    const inDb = await db.voter.findUnique({ where: { voterIdHash: voterIdHashCheck }, select: { id: true } });
+    const inDb = await db.voter.findFirst({ where: { voterIdHash: voterIdHashCheck, ...notRevoked }, select: { id: true } });
     if (inDb) {
       skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "NSE number already registered" });
       continue;

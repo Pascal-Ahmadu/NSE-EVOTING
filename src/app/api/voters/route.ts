@@ -96,10 +96,15 @@ export async function POST(req: Request) {
 
   // Pre-check uniqueness against the hash columns so we can return a clean 409
   // before attempting the insert. The DB unique index is the source of truth.
+  // Exclude revoked (soft-deleted) voters so they can be re-registered.
   const emailHash = hashPII(email);
   const voterIdHash = hashPII(voterId);
+  const revokedIds = await getRevokedIds("voter");
   const existing = await db.voter.findFirst({
-    where: { OR: [{ emailHash }, { voterIdHash }] },
+    where: {
+      OR: [{ emailHash }, { voterIdHash }],
+      ...(revokedIds.length > 0 ? { id: { notIn: revokedIds } } : {}),
+    },
     select: { emailHash: true, voterIdHash: true },
   });
   if (existing) {
