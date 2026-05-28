@@ -8,7 +8,7 @@ import { requireSameOrigin } from "@/lib/csrf";
 import { audit, requestMeta } from "@/lib/audit";
 import { buildPage, parsePageParams } from "@/lib/pagination";
 import { Email, Name, Password, VoterIdInput, parseJson } from "@/lib/zod-helpers";
-import { getRevokedIds } from "@/lib/revocation";
+import { getRevokedIds, isRevoked, unrevoke } from "@/lib/revocation";
 import { decryptVoterFields, encryptVoter } from "@/lib/voter-pii";
 import { hashPII } from "@/lib/pii";
 
@@ -18,6 +18,40 @@ const CreateBody = z.object({
   voterId: VoterIdInput,
   password: Password,
 });
+
+async function restoreVoter(
+  id: string,
+  fields: { name: string; email: string; voterId: string; password: string },
+  adminId: string,
+  req: Request,
+): Promise<NextResponse> {
+  const { name, email, voterId, password } = fields;
+  const encrypted = encryptVoter({ name, email, voterId });
+  const updated = await db.voter.update({
+    where: { id },
+    data: { ...encrypted, passwordHash: await hashSecret(password), registeredAt: new Date() },
+    select: { id: true, registeredAt: true },
+  });
+  await unrevoke("voter", id);
+
+  const admin = await db.admin.findUnique({ where: { id: adminId }, select: { email: true } });
+  const meta = requestMeta(req);
+  await audit({
+    adminId,
+    adminEmail: admin?.email ?? null,
+    action: "voter.restore",
+    targetType: "voter",
+    targetId: id,
+    details: { email, voterId },
+    ip: meta.ip,
+    userAgent: meta.userAgent,
+  });
+
+  return NextResponse.json(
+    { voter: { id, name, email, voterId, registeredAt: updated.registeredAt.toISOString(), password } },
+    { status: 200 },
+  );
+}
 
 const SAFE_FIELDS = {
   id: true,
@@ -94,32 +128,39 @@ export async function POST(req: Request) {
   if (!parsed.ok) return parsed.response;
   const { name, email, voterId, password } = parsed.data;
 
-  // Pre-check uniqueness against the hash columns so we can return a clean 409
-  // before attempting the insert. The DB unique index is the source of truth.
-  // Exclude revoked (soft-deleted) voters so they can be re-registered.
   const emailHash = hashPII(email);
   const voterIdHash = hashPII(voterId);
-  const revokedIds = await getRevokedIds("voter");
-  const existing = await db.voter.findFirst({
-    where: {
-      OR: [{ emailHash }, { voterIdHash }],
-      ...(revokedIds.length > 0 ? { id: { notIn: revokedIds } } : {}),
-    },
-    select: { emailHash: true, voterIdHash: true },
+
+  // Check for existing voter by email (including revoked ones for potential restore)
+  const byEmail = await db.voter.findFirst({
+    where: { emailHash },
+    select: { id: true, registeredAt: true },
   });
-  if (existing) {
-    if (existing.emailHash === emailHash) {
+  if (byEmail) {
+    if (!(await isRevoked("voter", byEmail.id))) {
       return NextResponse.json(
         { error: "A voter with this email already exists" },
         { status: 409 },
       );
     }
-    if (existing.voterIdHash === voterIdHash) {
+    // Revoked — restore with updated details
+    return await restoreVoter(byEmail.id, { name, email, voterId, password }, guard.value.adminId, req);
+  }
+
+  // Check for existing voter by NSE number
+  const byVoterId = await db.voter.findFirst({
+    where: { voterIdHash },
+    select: { id: true, registeredAt: true },
+  });
+  if (byVoterId) {
+    if (!(await isRevoked("voter", byVoterId.id))) {
       return NextResponse.json(
         { error: "A voter with this voter ID already exists" },
         { status: 409 },
       );
     }
+    // Revoked — restore with updated details
+    return await restoreVoter(byVoterId.id, { name, email, voterId, password }, guard.value.adminId, req);
   }
 
   const encrypted = encryptVoter({ name, email, voterId });
@@ -130,10 +171,7 @@ export async function POST(req: Request) {
         ...encrypted,
         passwordHash: await hashSecret(password),
       },
-      select: {
-        id: true,
-        registeredAt: true,
-      },
+      select: { id: true, registeredAt: true },
     });
   } catch (err) {
     if (

@@ -34,6 +34,13 @@ export async function revoke(input: {
   });
 }
 
+export async function unrevoke(
+  targetType: RevocationTargetType,
+  targetId: string,
+): Promise<void> {
+  await db.revocation.deleteMany({ where: { targetType, targetId } });
+}
+
 export async function getRevokedIds(
   targetType: RevocationTargetType,
 ): Promise<string[]> {

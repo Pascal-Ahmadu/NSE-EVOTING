@@ -7,7 +7,7 @@ import { hashPII } from "@/lib/pii";
 import { hashSecret } from "@/lib/password";
 import { encryptVoter } from "@/lib/voter-pii";
 import { generateVoterId, generatePassword } from "@/lib/voter-codegen";
-import { getRevokedIds } from "@/lib/revocation";
+import { getRevokedIds, isRevoked, unrevoke } from "@/lib/revocation";
 import { Prisma } from "@prisma/client";
 
 interface ImportedVoter {
@@ -149,38 +149,48 @@ export async function POST(req: Request) {
       continue;
     }
 
-    const emailHash = hashPII(row.email);
-    const existingByEmail = await db.voter.findFirst({
-      where: { emailHash, ...notRevoked },
-      select: { id: true },
-    });
-    if (existingByEmail) {
-      skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "Email already registered" });
-      continue;
-    }
-
     if (!row.voterId) {
       skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "NSE number (voter_id) is required" });
       continue;
     }
-    // Validate format: 4–32 alphanumeric/dash characters
     if (!/^[A-Z0-9-]{4,32}$/.test(row.voterId)) {
       skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "Invalid NSE number format (4–32 letters, numbers or dashes)" });
       continue;
     }
+
+    const emailHash = hashPII(row.email);
     const voterIdHashCheck = hashPII(row.voterId);
+
     if (batchVoterIdHashes.has(voterIdHashCheck)) {
       skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "Duplicate NSE number in this file" });
       continue;
     }
-    const inDb = await db.voter.findFirst({ where: { voterIdHash: voterIdHashCheck, ...notRevoked }, select: { id: true } });
-    if (inDb) {
-      skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "NSE number already registered" });
+
+    // Check for an existing voter by email or NSE number (including revoked ones for restore)
+    const existingByEmail = await db.voter.findFirst({ where: { emailHash }, select: { id: true } });
+    const existingByVoterId = await db.voter.findFirst({ where: { voterIdHash: voterIdHashCheck }, select: { id: true } });
+    const existingMatch = existingByEmail ?? existingByVoterId;
+
+    if (existingMatch) {
+      if (!(await isRevoked("voter", existingMatch.id))) {
+        skipped.push({ row: rowNum, name: row.name, email: row.email, reason: "Already registered (active)" });
+        continue;
+      }
+      // Revoked — restore with updated details
+      const password = generatePassword();
+      const encrypted = encryptVoter({ name: row.name, email: row.email, voterId: row.voterId });
+      await db.voter.update({
+        where: { id: existingMatch.id },
+        data: { ...encrypted, passwordHash: await hashSecret(password), registeredAt: new Date() },
+      });
+      await unrevoke("voter", existingMatch.id);
+      batchVoterIdHashes.add(voterIdHashCheck);
+      created.push({ name: row.name, email: row.email, voterId: row.voterId, password });
       continue;
     }
+
     batchVoterIdHashes.add(voterIdHashCheck);
     const voterId = row.voterId;
-
     const password = generatePassword();
     const voterIdHash = hashPII(voterId);
     const encrypted = encryptVoter({ name: row.name, email: row.email, voterId });
@@ -205,7 +215,6 @@ export async function POST(req: Request) {
             ? "Voter ID collision — retry the import"
             : "Duplicate record";
         skipped.push({ row: rowNum, name: row.name, email: row.email, reason });
-        // Remove the reserved voter ID hash if the insert failed
         batchVoterIdHashes.delete(voterIdHash);
       } else {
         throw err;
