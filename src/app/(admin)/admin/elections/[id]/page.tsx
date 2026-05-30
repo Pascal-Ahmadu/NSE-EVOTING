@@ -902,15 +902,27 @@ export default function ElectionDetailPage() {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               {isOpen ? "Live results" : "Final results"}
             </h2>
-            {isOpen && (
-              <button
-                type="button"
-                onClick={refresh}
-                className="text-sm text-brand-500 hover:text-brand-600"
-              >
-                Refresh
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              {isOpen && (
+                <button
+                  type="button"
+                  onClick={refresh}
+                  className="text-sm text-brand-500 hover:text-brand-600"
+                >
+                  Refresh
+                </button>
+              )}
+              {isClosed && election && (
+                <a
+                  href={`/print/elections/${election.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-brand-500 hover:text-brand-600"
+                >
+                  Print results
+                </a>
+              )}
+            </div>
           </div>
           <ResultsList tally={resultsListInput} closed={isClosed} />
         </section>

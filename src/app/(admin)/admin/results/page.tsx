@@ -150,13 +150,25 @@ export default function ResultsPage() {
                   {election.ballotCount === 1 ? "" : "s"} submitted
                 </p>
               </div>
-              <Link
-                href={`/admin/elections/${election.id}`}
-                className="inline-flex items-center gap-1 text-sm text-brand-500 hover:text-brand-600"
-              >
-                Manage election
-                <ChevronRightIcon aria-hidden="true" className="h-4 w-4" />
-              </Link>
+              <div className="flex items-center gap-4">
+                {election.status === "closed" && (
+                  <a
+                    href={`/print/elections/${election.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-gray-500 hover:text-brand-500"
+                  >
+                    Print results
+                  </a>
+                )}
+                <Link
+                  href={`/admin/elections/${election.id}`}
+                  className="inline-flex items-center gap-1 text-sm text-brand-500 hover:text-brand-600"
+                >
+                  Manage election
+                  <ChevronRightIcon aria-hidden="true" className="h-4 w-4" />
+                </Link>
+              </div>
             </div>
 
             {election.tally.length === 0 ? (

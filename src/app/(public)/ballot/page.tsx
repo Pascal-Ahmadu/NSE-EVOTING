@@ -52,6 +52,7 @@ export default function BallotPage() {
   const [selections, setSelections] = useState<SelectionMap>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,10 +95,14 @@ export default function BallotPage() {
     if (submitError) setSubmitError(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (view.kind !== "ready" || !view.context.election || !allChosen || submitting) return;
+    setReviewing(true);
+  };
 
+  const handleConfirmSubmit = async () => {
+    if (view.kind !== "ready" || !view.context.election || !allChosen || submitting) return;
     setSubmitting(true);
     const result = await apiCall<{ ok: true }>("/api/ballots", {
       method: "POST",
@@ -112,10 +117,9 @@ export default function BallotPage() {
     if (!result.ok) {
       setSubmitError(result.error);
       setSubmitting(false);
+      setReviewing(false);
       return;
     }
-    // Keep the voter signed in so they can browse to /dashboard from the
-    // confirmation page. Sign-out is now an explicit action.
     router.push("/confirmation?status=submitted");
   };
 
@@ -297,9 +301,8 @@ export default function BallotPage() {
                 size="lg"
                 className="w-full"
                 disabled={!allChosen}
-                loading={submitting}
               >
-                {submitting ? "Submitting…" : "Submit ballot"}
+                Review &amp; submit
               </Button>
             </div>
           </div>
@@ -312,6 +315,73 @@ export default function BallotPage() {
           Cancel and return home
         </Link>
       </p>
+
+      {/* Review overlay */}
+      {reviewing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
+            <div className="p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                Review your ballot
+              </h2>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Confirm your selections — once submitted this cannot be changed.
+              </p>
+              <ul className="mt-5 divide-y divide-gray-100 dark:divide-gray-800">
+                {positions.map((position) => {
+                  const candidate = position.candidates.find(
+                    (c) => c.id === selections[position.id],
+                  );
+                  return (
+                    <li key={position.id} className="flex items-center justify-between gap-4 py-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-brand-500">
+                          {position.title}
+                        </p>
+                        <p className="mt-0.5 truncate text-base font-semibold text-gray-900 dark:text-white">
+                          {candidate?.name ?? "—"}
+                        </p>
+                      </div>
+                      {candidate?.photoUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={candidate.photoUrl}
+                          alt={candidate.name}
+                          className="h-10 w-10 shrink-0 rounded-full object-cover ring-2 ring-gray-200 dark:ring-gray-700"
+                        />
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+            {submitError && (
+              <p role="alert" className="px-6 pb-2 text-sm text-error-500">
+                {submitError}
+              </p>
+            )}
+            <div className="flex flex-col gap-3 border-t border-gray-100 p-6 pt-4 sm:flex-row-reverse dark:border-gray-800">
+              <Button
+                size="lg"
+                className="flex-1"
+                onClick={handleConfirmSubmit}
+                loading={submitting}
+                disabled={submitting}
+              >
+                {submitting ? "Submitting…" : "Confirm & submit"}
+              </Button>
+              <button
+                type="button"
+                onClick={() => setReviewing(false)}
+                disabled={submitting}
+                className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-base font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-white/5"
+              >
+                Edit selections
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
