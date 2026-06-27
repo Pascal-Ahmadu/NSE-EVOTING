@@ -304,7 +304,7 @@ export default function VotersPage() {
 
   const setField = <K extends keyof VoterForm>(key: K, value: VoterForm[K]) => {
     setForm((p) => ({ ...p, [key]: value }));
-    if (errors[key] || errors.form) setErrors({});
+    if (errors[key as keyof FieldErrors] || errors.form) setErrors({});
   };
 
   if (!page) {
