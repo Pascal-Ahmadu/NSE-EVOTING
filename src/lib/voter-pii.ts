@@ -10,6 +10,7 @@ export interface VoterPlaintext {
   name: string;
   email: string;
   voterId: string;
+  phone?: string;
 }
 
 export interface VoterEncryptedColumns {
@@ -18,6 +19,7 @@ export interface VoterEncryptedColumns {
   voterId: string;
   emailHash: string;
   voterIdHash: string;
+  phone?: string;
 }
 
 /** Produce ciphertext + hash columns for a voter insert. */
@@ -28,6 +30,7 @@ export function encryptVoter(input: VoterPlaintext): VoterEncryptedColumns {
     voterId: encryptPII(input.voterId),
     emailHash: hashPII(input.email),
     voterIdHash: hashPII(input.voterId),
+    ...(input.phone ? { phone: encryptPII(input.phone) } : {}),
   };
 }
 
@@ -37,12 +40,13 @@ export function encryptVoter(input: VoterPlaintext): VoterEncryptedColumns {
  * (legacy plaintext rows).
  */
 export function decryptVoterFields<
-  T extends { name: string; email: string; voterId: string },
+  T extends { name: string; email: string; voterId: string; phone?: string | null },
 >(row: T): T {
   return {
     ...row,
     name: tryDecrypt(row.name),
     email: tryDecrypt(row.email),
     voterId: tryDecrypt(row.voterId),
+    phone: row.phone ? tryDecrypt(row.phone) : row.phone,
   };
 }

@@ -11,28 +11,34 @@ import { Email, Name, Password, VoterIdInput, parseJson } from "@/lib/zod-helper
 import { getRevokedIds, isRevoked, unrevoke } from "@/lib/revocation";
 import { decryptVoterFields, encryptVoter } from "@/lib/voter-pii";
 import { hashPII } from "@/lib/pii";
+import { sendVoterCredentials } from "@/lib/messaging";
 
 const CreateBody = z.object({
   name: Name,
   email: Email,
   voterId: VoterIdInput,
   password: Password,
+  phone: z.string().trim().optional(),
 });
 
 async function restoreVoter(
   id: string,
-  fields: { name: string; email: string; voterId: string; password: string },
+  fields: { name: string; email: string; voterId: string; password: string; phone?: string },
   adminId: string,
   req: Request,
 ): Promise<NextResponse> {
-  const { name, email, voterId, password } = fields;
-  const encrypted = encryptVoter({ name, email, voterId });
+  const { name, email, voterId, password, phone } = fields;
+  const encrypted = encryptVoter({ name, email, voterId, phone });
   const updated = await db.voter.update({
     where: { id },
     data: { ...encrypted, passwordHash: await hashSecret(password), registeredAt: new Date() },
     select: { id: true, registeredAt: true },
   });
   await unrevoke("voter", id);
+
+  if (phone) {
+    void sendVoterCredentials({ phone, name, voterId, password });
+  }
 
   const admin = await db.admin.findUnique({ where: { id: adminId }, select: { email: true } });
   const meta = requestMeta(req);
@@ -126,7 +132,7 @@ export async function POST(req: Request) {
 
   const parsed = await parseJson(req, CreateBody);
   if (!parsed.ok) return parsed.response;
-  const { name, email, voterId, password } = parsed.data;
+  const { name, email, voterId, password, phone } = parsed.data;
 
   const emailHash = hashPII(email);
   const voterIdHash = hashPII(voterId);
@@ -143,8 +149,7 @@ export async function POST(req: Request) {
         { status: 409 },
       );
     }
-    // Revoked — restore with updated details
-    return await restoreVoter(byEmail.id, { name, email, voterId, password }, guard.value.adminId, req);
+    return await restoreVoter(byEmail.id, { name, email, voterId, password, phone }, guard.value.adminId, req);
   }
 
   // Check for existing voter by NSE number
@@ -159,11 +164,10 @@ export async function POST(req: Request) {
         { status: 409 },
       );
     }
-    // Revoked — restore with updated details
-    return await restoreVoter(byVoterId.id, { name, email, voterId, password }, guard.value.adminId, req);
+    return await restoreVoter(byVoterId.id, { name, email, voterId, password, phone }, guard.value.adminId, req);
   }
 
-  const encrypted = encryptVoter({ name, email, voterId });
+  const encrypted = encryptVoter({ name, email, voterId, phone });
   let created;
   try {
     created = await db.voter.create({
@@ -193,6 +197,10 @@ export async function POST(req: Request) {
       }
     }
     throw err;
+  }
+
+  if (phone) {
+    void sendVoterCredentials({ phone, name, voterId, password });
   }
 
   const admin = await db.admin.findUnique({

@@ -8,6 +8,7 @@ import { hashSecret } from "@/lib/password";
 import { encryptVoter } from "@/lib/voter-pii";
 import { generateVoterId, generatePassword } from "@/lib/voter-codegen";
 import { getRevokedIds, isRevoked, unrevoke } from "@/lib/revocation";
+import { sendVoterCredentials } from "@/lib/messaging";
 import { Prisma } from "@prisma/client";
 
 interface ImportedVoter {
@@ -15,6 +16,7 @@ interface ImportedVoter {
   email: string;
   voterId: string;
   password: string;
+  phone?: string;
 }
 
 interface SkippedRow {
@@ -24,7 +26,7 @@ interface SkippedRow {
   reason: string;
 }
 
-function parseCSV(text: string): { name: string; email: string; voterId: string }[] {
+function parseCSV(text: string): { name: string; email: string; voterId: string; phone: string }[] {
   const lines = text
     .split(/\r?\n/)
     .map((l) => l.trim())
@@ -32,7 +34,6 @@ function parseCSV(text: string): { name: string; email: string; voterId: string 
 
   if (lines.length < 2) return [];
 
-  // Detect header: first row must have "name" and "email" columns; "voter_id" / "voterid" / "voter id" is optional
   const header = lines[0]!
     .toLowerCase()
     .split(",")
@@ -43,15 +44,20 @@ function parseCSV(text: string): { name: string; email: string; voterId: string 
     (found, key) => (found === -1 ? header.indexOf(key) : found),
     -1,
   );
+  const phoneIdx = ["phone", "phonenumber", "mobile", "whatsapp"].reduce<number>(
+    (found, key) => (found === -1 ? header.indexOf(key) : found),
+    -1,
+  );
   if (nameIdx === -1 || emailIdx === -1) return [];
 
-  const rows: { name: string; email: string; voterId: string }[] = [];
+  const rows: { name: string; email: string; voterId: string; phone: string }[] = [];
   for (let i = 1; i < lines.length; i++) {
     const cols = splitCSVLine(lines[i]!);
     const name = (cols[nameIdx] ?? "").trim();
     const email = (cols[emailIdx] ?? "").trim().toLowerCase();
     const voterId = voterIdIdx !== -1 ? (cols[voterIdIdx] ?? "").trim().toUpperCase() : "";
-    if (name || email) rows.push({ name, email, voterId });
+    const phone = phoneIdx !== -1 ? (cols[phoneIdx] ?? "").trim() : "";
+    if (name || email) rows.push({ name, email, voterId, phone });
   }
   return rows;
 }
@@ -178,14 +184,15 @@ export async function POST(req: Request) {
       }
       // Revoked — restore with updated details
       const password = generatePassword();
-      const encrypted = encryptVoter({ name: row.name, email: row.email, voterId: row.voterId });
+      const encrypted = encryptVoter({ name: row.name, email: row.email, voterId: row.voterId, phone: row.phone || undefined });
       await db.voter.update({
         where: { id: existingMatch.id },
         data: { ...encrypted, passwordHash: await hashSecret(password), registeredAt: new Date() },
       });
       await unrevoke("voter", existingMatch.id);
+      if (row.phone) void sendVoterCredentials({ phone: row.phone, name: row.name, voterId: row.voterId, password });
       batchVoterIdHashes.add(voterIdHashCheck);
-      created.push({ name: row.name, email: row.email, voterId: row.voterId, password });
+      created.push({ name: row.name, email: row.email, voterId: row.voterId, password, phone: row.phone || undefined });
       continue;
     }
 
@@ -193,7 +200,7 @@ export async function POST(req: Request) {
     const voterId = row.voterId;
     const password = generatePassword();
     const voterIdHash = hashPII(voterId);
-    const encrypted = encryptVoter({ name: row.name, email: row.email, voterId });
+    const encrypted = encryptVoter({ name: row.name, email: row.email, voterId, phone: row.phone || undefined });
 
     try {
       await db.voter.create({
@@ -202,7 +209,8 @@ export async function POST(req: Request) {
           passwordHash: await hashSecret(password),
         },
       });
-      created.push({ name: row.name, email: row.email, voterId, password });
+      if (row.phone) void sendVoterCredentials({ phone: row.phone, name: row.name, voterId, password });
+      created.push({ name: row.name, email: row.email, voterId, password, phone: row.phone || undefined });
     } catch (err) {
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&

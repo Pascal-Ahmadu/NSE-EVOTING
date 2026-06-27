@@ -56,6 +56,7 @@ interface VoterForm {
   email: string;
   voterId: string;
   password: string;
+  phone: string;
 }
 
 interface FieldErrors {
@@ -66,7 +67,7 @@ interface FieldErrors {
   form?: string;
 }
 
-const EMPTY_FORM: VoterForm = { name: "", email: "", voterId: "", password: "" };
+const EMPTY_FORM: VoterForm = { name: "", email: "", voterId: "", password: "", phone: "" };
 const PAGE_SIZE = 20;
 
 const formatDate = (iso: string): string =>
@@ -513,6 +514,19 @@ export default function VotersPage() {
                 />
               </div>
               <div>
+                <Label htmlFor="new-voter-phone">WhatsApp / Phone number</Label>
+                <Input
+                  id="new-voter-phone"
+                  type="tel"
+                  value={form.phone ?? ""}
+                  onChange={(e) => setField("phone", e.target.value)}
+                  placeholder="e.g. 08012345678"
+                  autoComplete="off"
+                  maxLength={20}
+                  hint="Optional — credentials will be sent via WhatsApp if provided"
+                />
+              </div>
+              <div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="new-voter-password">Password</Label>
                   <button
@@ -609,8 +623,8 @@ export default function VotersPage() {
             </p>
             <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-800/40 dark:text-gray-400">
               <p className="font-medium text-gray-700 dark:text-gray-300">Expected CSV format:</p>
-              <pre className="mt-1 font-mono">{"name,email,voter_id\nAda Lovelace,ada@example.com,NSE12345\nAlan Turing,alan@example.com,NSE67890"}</pre>
-              <p className="mt-2">The <code className="font-mono bg-gray-100 dark:bg-gray-800 px-1 rounded">voter_id</code> column is required — use each member&apos;s NSE number. Maximum 200 rows per import.</p>
+              <pre className="mt-1 font-mono">{"name,email,voter_id,phone\nAda Lovelace,ada@example.com,NSE12345,08012345678\nAlan Turing,alan@example.com,NSE67890,"}</pre>
+              <p className="mt-2">The <code className="font-mono bg-gray-100 dark:bg-gray-800 px-1 rounded">voter_id</code> column is required — use each member&apos;s NSE number. The <code className="font-mono bg-gray-100 dark:bg-gray-800 px-1 rounded">phone</code> column is optional — credentials are sent via WhatsApp when provided. Maximum 200 rows per import.</p>
             </div>
             <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">

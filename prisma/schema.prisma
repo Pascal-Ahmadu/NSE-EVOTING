@@ -50,6 +50,7 @@ model Voter {
   emailHash    String?  @unique
   voterIdHash  String?  @unique
   passwordHash String
+  phone        String?
   registeredAt DateTime @default(now())
 
   eligibilities VoterEligibility[]
