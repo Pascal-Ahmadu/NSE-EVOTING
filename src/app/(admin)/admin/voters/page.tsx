@@ -42,6 +42,7 @@ interface BulkImportRow {
   email: string;
   voterId: string;
   password: string;
+  phone?: string;
 }
 
 interface SkippedRow {
@@ -68,6 +69,26 @@ interface FieldErrors {
 }
 
 const EMPTY_FORM: VoterForm = { name: "", email: "", voterId: "", password: "", phone: "" };
+
+function whatsappUrl(voter: { name: string; voterId: string; password: string }, phone?: string): string {
+  const appUrl = typeof window !== "undefined" ? window.location.origin : "";
+  const text = [
+    `Hello ${voter.name},`,
+    "",
+    "Your NSE e-voting credentials:",
+    `Voter ID: ${voter.voterId}`,
+    `Password: ${voter.password}`,
+    "",
+    `Vote at: ${appUrl}`,
+    "",
+    "Do not share these credentials.",
+  ].join("\n");
+  const digits = (phone ?? "").replace(/\D/g, "");
+  const normalised = digits.startsWith("234") ? digits : digits.startsWith("0") ? "234" + digits.slice(1) : digits ? "234" + digits : "";
+  return normalised
+    ? `https://wa.me/${normalised}?text=${encodeURIComponent(text)}`
+    : `https://wa.me/?text=${encodeURIComponent(text)}`;
+}
 const PAGE_SIZE = 20;
 
 const formatDate = (iso: string): string =>
@@ -594,17 +615,29 @@ export default function VotersPage() {
             </dl>
 
             <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-              The password is shown only this once. Copy it and share through your usual channel — the platform does not send emails.
+              The password is shown only this once. Share via WhatsApp or copy before closing.
             </p>
 
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <a
+                href={whatsappUrl(view.voter, form.phone)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#25D366] bg-[#25D366]/10 px-3 py-1.5 text-sm font-medium text-[#128C7E] hover:bg-[#25D366]/20 dark:text-[#25D366]"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                  <path d="M12 0C5.373 0 0 5.373 0 12c0 2.119.553 4.103 1.522 5.826L.057 23.854a.5.5 0 0 0 .609.61l6.098-1.475A11.949 11.949 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.898a9.898 9.898 0 0 1-5.051-1.382l-.361-.214-3.742.906.944-3.643-.235-.374A9.862 9.862 0 0 1 2.103 12C2.103 6.529 6.529 2.103 12 2.103S21.897 6.529 21.897 12 17.471 21.898 12 21.898z"/>
+                </svg>
+                Share via WhatsApp
+              </a>
               <Button
                 variant="outline"
                 size="sm"
                 startIcon={<CopyIcon />}
                 onClick={() => handleCopyCredentials(view.voter)}
               >
-                {copied ? "Copied" : "Copy credentials"}
+                {copied ? "Copied" : "Copy"}
               </Button>
               <Button size="sm" onClick={closeModal}>
                 Done
@@ -624,7 +657,7 @@ export default function VotersPage() {
             <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-800/40 dark:text-gray-400">
               <p className="font-medium text-gray-700 dark:text-gray-300">Expected CSV format:</p>
               <pre className="mt-1 font-mono">{"name,email,voter_id,phone\nAda Lovelace,ada@example.com,NSE12345,08012345678\nAlan Turing,alan@example.com,NSE67890,"}</pre>
-              <p className="mt-2">The <code className="font-mono bg-gray-100 dark:bg-gray-800 px-1 rounded">voter_id</code> column is required — use each member&apos;s NSE number. The <code className="font-mono bg-gray-100 dark:bg-gray-800 px-1 rounded">phone</code> column is optional — credentials are sent via WhatsApp when provided. Maximum 200 rows per import.</p>
+              <p className="mt-2">The <code className="font-mono bg-gray-100 dark:bg-gray-800 px-1 rounded">voter_id</code> column is required — use each member&apos;s NSE number. The <code className="font-mono bg-gray-100 dark:bg-gray-800 px-1 rounded">phone</code> column is optional — when included, a WhatsApp share link is shown per row in the results so you can send credentials with one click. Maximum 200 rows per import.</p>
             </div>
             <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
@@ -680,18 +713,32 @@ export default function VotersPage() {
                 <thead className="sticky top-0 bg-gray-50 dark:bg-gray-800 text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   <tr>
                     <th className="px-3 py-2 font-medium">Name</th>
-                    <th className="px-3 py-2 font-medium">Email</th>
                     <th className="px-3 py-2 font-medium">Voter ID</th>
                     <th className="px-3 py-2 font-medium">Password</th>
+                    <th className="px-3 py-2 font-medium">Share</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {view.created.map((v, i) => (
                     <tr key={i} className="text-gray-700 dark:text-gray-300">
                       <td className="px-3 py-2">{v.name}</td>
-                      <td className="px-3 py-2">{v.email}</td>
                       <td className="px-3 py-2 font-mono text-brand-500">{v.voterId}</td>
                       <td className="px-3 py-2 font-mono">{v.password}</td>
+                      <td className="px-3 py-2">
+                        <a
+                          href={whatsappUrl(v, v.phone)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Send via WhatsApp"
+                          className="inline-flex items-center gap-1 text-[#128C7E] hover:underline dark:text-[#25D366]"
+                        >
+                          <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current shrink-0" aria-hidden="true">
+                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                            <path d="M12 0C5.373 0 0 5.373 0 12c0 2.119.553 4.103 1.522 5.826L.057 23.854a.5.5 0 0 0 .609.61l6.098-1.475A11.949 11.949 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.898a9.898 9.898 0 0 1-5.051-1.382l-.361-.214-3.742.906.944-3.643-.235-.374A9.862 9.862 0 0 1 2.103 12C2.103 6.529 6.529 2.103 12 2.103S21.897 6.529 21.897 12 17.471 21.898 12 21.898z"/>
+                          </svg>
+                          WhatsApp
+                        </a>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

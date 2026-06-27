@@ -11,7 +11,6 @@ import { Email, Name, Password, VoterIdInput, parseJson } from "@/lib/zod-helper
 import { getRevokedIds, isRevoked, unrevoke } from "@/lib/revocation";
 import { decryptVoterFields, encryptVoter } from "@/lib/voter-pii";
 import { hashPII } from "@/lib/pii";
-import { sendVoterCredentials } from "@/lib/messaging";
 
 const CreateBody = z.object({
   name: Name,
@@ -35,10 +34,6 @@ async function restoreVoter(
     select: { id: true, registeredAt: true },
   });
   await unrevoke("voter", id);
-
-  if (phone) {
-    void sendVoterCredentials({ phone, name, voterId, password });
-  }
 
   const admin = await db.admin.findUnique({ where: { id: adminId }, select: { email: true } });
   const meta = requestMeta(req);
@@ -197,10 +192,6 @@ export async function POST(req: Request) {
       }
     }
     throw err;
-  }
-
-  if (phone) {
-    void sendVoterCredentials({ phone, name, voterId, password });
   }
 
   const admin = await db.admin.findUnique({

@@ -8,7 +8,6 @@ import { hashSecret } from "@/lib/password";
 import { encryptVoter } from "@/lib/voter-pii";
 import { generateVoterId, generatePassword } from "@/lib/voter-codegen";
 import { getRevokedIds, isRevoked, unrevoke } from "@/lib/revocation";
-import { sendVoterCredentials } from "@/lib/messaging";
 import { Prisma } from "@prisma/client";
 
 interface ImportedVoter {
@@ -190,7 +189,6 @@ export async function POST(req: Request) {
         data: { ...encrypted, passwordHash: await hashSecret(password), registeredAt: new Date() },
       });
       await unrevoke("voter", existingMatch.id);
-      if (row.phone) void sendVoterCredentials({ phone: row.phone, name: row.name, voterId: row.voterId, password });
       batchVoterIdHashes.add(voterIdHashCheck);
       created.push({ name: row.name, email: row.email, voterId: row.voterId, password, phone: row.phone || undefined });
       continue;
@@ -209,7 +207,6 @@ export async function POST(req: Request) {
           passwordHash: await hashSecret(password),
         },
       });
-      if (row.phone) void sendVoterCredentials({ phone: row.phone, name: row.name, voterId, password });
       created.push({ name: row.name, email: row.email, voterId, password, phone: row.phone || undefined });
     } catch (err) {
       if (
