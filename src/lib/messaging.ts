@@ -8,18 +8,11 @@ function normalizePhone(raw: string): string | null {
 }
 
 /**
- * Send voter credentials via a pre-approved Termii WhatsApp template.
+ * Send voter credentials via Termii Direct SMS.
  *
  * Required env vars:
- *   TERMII_API_KEY      – from Termii dashboard
- *   TERMII_DEVICE_ID    – WhatsApp Device ID from Termii dashboard
- *   TERMII_TEMPLATE_ID  – ID of the approved template
- *
- * Expected template variable mapping (set up the template in Termii to match):
- *   {{1}} = voter name
- *   {{2}} = voter ID
- *   {{3}} = password
- *   {{4}} = voting URL
+ *   TERMII_API_KEY    – from Termii dashboard
+ *   TERMII_SENDER_ID  – approved Sender ID from Termii → IDs (e.g. "NSEvoting")
  */
 export async function sendVoterCredentials({
   phone,
@@ -33,31 +26,33 @@ export async function sendVoterCredentials({
   password: string;
 }): Promise<boolean> {
   const apiKey = process.env.TERMII_API_KEY;
-  const deviceId = process.env.TERMII_DEVICE_ID;
-  const templateId = process.env.TERMII_TEMPLATE_ID;
+  const senderId = process.env.TERMII_SENDER_ID ?? "NSEvoting";
 
-  if (!apiKey || !deviceId || !templateId) return false;
+  if (!apiKey) return false;
 
   const to = normalizePhone(phone);
   if (!to) return false;
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://nse-evoting.vercel.app";
 
+  const sms =
+    `Hello ${name}, your NSE e-voting credentials:\n` +
+    `Voter ID: ${voterId}\n` +
+    `Password: ${password}\n` +
+    `Vote at: ${appUrl}\n` +
+    `Do not share these credentials.`;
+
   try {
-    const res = await fetch("https://v3.api.termii.com/api/send/template", {
+    const res = await fetch("https://v3.api.termii.com/api/sms/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        phone_number: to,
-        device_id: deviceId,
-        template_id: templateId,
+        to,
+        from: senderId,
+        sms,
+        type: "plain",
+        channel: "generic",
         api_key: apiKey,
-        data: {
-          "1": name,
-          "2": voterId,
-          "3": password,
-          "4": appUrl,
-        },
       }),
     });
     return res.ok;
