@@ -39,10 +39,16 @@ export async function sendVoterCredentials({
   const templateName = process.env.INFOBIP_TEMPLATE_NAME ?? "test_whatsapp_template_en";
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://nse-evoting.vercel.app";
 
-  if (!apiKey) return false;
+  if (!apiKey) {
+    console.error("[Infobip] INFOBIP_API_KEY env var is not set — skipping send");
+    return false;
+  }
 
   const to = normalizePhone(phone);
-  if (!to) return false;
+  if (!to) {
+    console.error("[Infobip] Could not normalise phone number:", phone);
+    return false;
+  }
 
   // Single placeholder carries all credential info
   const placeholder =
