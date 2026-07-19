@@ -8,18 +8,19 @@ function normalizePhone(raw: string): string | null {
 }
 
 /**
- * Send voter credentials via Infobip WhatsApp template message.
+ * Send voter credentials via Infobip WhatsApp using the "authentication" template.
+ *
+ * Template structure (1 body placeholder + URL button + Quick Reply button):
+ *   Body {{1}} → "Voter ID: XXXX | Password: YYYY"
  *
  * Required env vars:
- *   INFOBIP_API_KEY       – from Infobip dashboard
- *   INFOBIP_BASE_URL      – your Infobip base URL (e.g. 8vmrkr.api.infobip.com)
- *   INFOBIP_SENDER        – approved WhatsApp sender number (e.g. 447860088970)
- *   INFOBIP_TEMPLATE_NAME – approved template name with 4 placeholders:
- *                           {{1}} name  {{2}} voterId  {{3}} password  {{4}} url
+ *   INFOBIP_API_KEY   – from Infobip portal
+ *   INFOBIP_BASE_URL  – e.g. 8vmrkr.api.infobip.com
+ *   INFOBIP_SENDER    – WhatsApp sender number (test: 447860088970)
  */
 export async function sendVoterCredentials({
   phone,
-  name,
+  name: _name,
   voterId,
   password,
 }: {
@@ -31,14 +32,14 @@ export async function sendVoterCredentials({
   const apiKey = process.env.INFOBIP_API_KEY;
   const baseUrl = process.env.INFOBIP_BASE_URL ?? "8vmrkr.api.infobip.com";
   const from = process.env.INFOBIP_SENDER ?? "447860088970";
-  const templateName = process.env.INFOBIP_TEMPLATE_NAME ?? "nse_voter_credentials";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://nse-evoting.vercel.app";
 
   if (!apiKey) return false;
 
   const to = normalizePhone(phone);
   if (!to) return false;
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://nse-evoting.vercel.app";
+  const code = `Voter ID: ${voterId} | Password: ${password}`;
 
   try {
     const res = await fetch(`https://${baseUrl}/whatsapp/1/message/template`, {
@@ -54,11 +55,15 @@ export async function sendVoterCredentials({
             from,
             to,
             content: {
-              templateName,
+              templateName: "authentication",
               templateData: {
                 body: {
-                  placeholders: [name, voterId, password, appUrl],
+                  placeholders: [code],
                 },
+                buttons: [
+                  { type: "URL", parameter: appUrl },
+                  { type: "QUICK_REPLY", parameter: "noted" },
+                ],
               },
               language: "en",
             },
