@@ -35,7 +35,7 @@ async function restoreVoter(
     select: { id: true, registeredAt: true },
   });
   await unrevoke("voter", id);
-  if (phone) void sendVoterCredentials({ phone, name, voterId, password });
+  const whatsappSent = phone ? await sendVoterCredentials({ phone, name, voterId, password }) : false;
 
   const admin = await db.admin.findUnique({ where: { id: adminId }, select: { email: true } });
   const meta = requestMeta(req);
@@ -51,7 +51,7 @@ async function restoreVoter(
   });
 
   return NextResponse.json(
-    { voter: { id, name, email, voterId, registeredAt: updated.registeredAt.toISOString(), password } },
+    { voter: { id, name, email, voterId, registeredAt: updated.registeredAt.toISOString(), password }, whatsappSent },
     { status: 200 },
   );
 }
@@ -196,9 +196,7 @@ export async function POST(req: Request) {
     throw err;
   }
 
-  console.log("[voters POST] phone value:", JSON.stringify(phone));
   const whatsappSent = phone ? await sendVoterCredentials({ phone, name, voterId, password }) : false;
-  console.log("[voters POST] whatsappSent:", whatsappSent);
 
   const admin = await db.admin.findUnique({
     where: { id: guard.value.adminId },
