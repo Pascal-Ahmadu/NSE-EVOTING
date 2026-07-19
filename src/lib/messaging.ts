@@ -35,7 +35,7 @@ export async function sendVoterCredentials({
 }): Promise<boolean> {
   const apiKey = process.env.INFOBIP_API_KEY;
   const baseUrl = process.env.INFOBIP_BASE_URL ?? "8vmrkr.api.infobip.com";
-  const from = process.env.INFOBIP_SENDER ?? "447860088970";
+  const from = process.env.INFOBIP_SENDER || "447860088970";
   const templateName = process.env.INFOBIP_TEMPLATE_NAME ?? "test_whatsapp_template_en";
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://nse-evoting.vercel.app";
 
@@ -50,12 +50,9 @@ export async function sendVoterCredentials({
     return false;
   }
 
-  // Single placeholder carries all credential info
+  // Single placeholder — no newlines/tabs allowed by Infobip template API
   const placeholder =
-    `${name} — NSE e-voting credentials:\n` +
-    `Voter ID: ${voterId}\n` +
-    `Password: ${password}\n` +
-    `Vote at: ${appUrl}`;
+    `${name} | Voter ID: ${voterId} | Password: ${password} | Vote at: ${appUrl}`;
 
   try {
     const payload = {
