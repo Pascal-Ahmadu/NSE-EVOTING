@@ -1,4 +1,4 @@
-/** Normalise a Nigerian phone number to Termii's international format (234XXXXXXXXXX). */
+/** Normalise a Nigerian phone number to international format (234XXXXXXXXXX). */
 function normalizePhone(raw: string): string | null {
   const digits = raw.replace(/\D/g, "");
   if (digits.startsWith("234") && digits.length === 13) return digits;
@@ -8,11 +8,14 @@ function normalizePhone(raw: string): string | null {
 }
 
 /**
- * Send voter credentials via Termii Direct SMS.
+ * Send voter credentials via Infobip WhatsApp template message.
  *
  * Required env vars:
- *   TERMII_API_KEY    – from Termii dashboard
- *   TERMII_SENDER_ID  – approved Sender ID from Termii → IDs (e.g. "NSEvoting")
+ *   INFOBIP_API_KEY       – from Infobip dashboard
+ *   INFOBIP_BASE_URL      – your Infobip base URL (e.g. 8vmrkr.api.infobip.com)
+ *   INFOBIP_SENDER        – approved WhatsApp sender number (e.g. 447860088970)
+ *   INFOBIP_TEMPLATE_NAME – approved template name with 4 placeholders:
+ *                           {{1}} name  {{2}} voterId  {{3}} password  {{4}} url
  */
 export async function sendVoterCredentials({
   phone,
@@ -25,8 +28,10 @@ export async function sendVoterCredentials({
   voterId: string;
   password: string;
 }): Promise<boolean> {
-  const apiKey = process.env.TERMII_API_KEY;
-  const senderId = process.env.TERMII_SENDER_ID ?? "NSEvoting";
+  const apiKey = process.env.INFOBIP_API_KEY;
+  const baseUrl = process.env.INFOBIP_BASE_URL ?? "8vmrkr.api.infobip.com";
+  const from = process.env.INFOBIP_SENDER ?? "447860088970";
+  const templateName = process.env.INFOBIP_TEMPLATE_NAME ?? "nse_voter_credentials";
 
   if (!apiKey) return false;
 
@@ -35,24 +40,30 @@ export async function sendVoterCredentials({
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://nse-evoting.vercel.app";
 
-  const sms =
-    `Hello ${name}, your NSE e-voting credentials:\n` +
-    `Voter ID: ${voterId}\n` +
-    `Password: ${password}\n` +
-    `Vote at: ${appUrl}\n` +
-    `Do not share these credentials.`;
-
   try {
-    const res = await fetch("https://v3.api.termii.com/api/sms/send", {
+    const res = await fetch(`https://${baseUrl}/whatsapp/1/message/template`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        Authorization: `App ${apiKey}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
       body: JSON.stringify({
-        to,
-        from: senderId,
-        sms,
-        type: "plain",
-        channel: "generic",
-        api_key: apiKey,
+        messages: [
+          {
+            from,
+            to,
+            content: {
+              templateName,
+              templateData: {
+                body: {
+                  placeholders: [name, voterId, password, appUrl],
+                },
+              },
+              language: "en",
+            },
+          },
+        ],
       }),
     });
     return res.ok;
