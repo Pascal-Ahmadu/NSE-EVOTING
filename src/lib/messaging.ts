@@ -52,6 +52,24 @@ export async function sendVoterCredentials({
     `Vote at: ${appUrl}`;
 
   try {
+    const payload = {
+      messages: [
+        {
+          from,
+          to,
+          content: {
+            templateName,
+            templateData: {
+              body: {
+                placeholders: [placeholder],
+              },
+            },
+            language: "en",
+          },
+        },
+      ],
+    };
+
     const res = await fetch(`https://${baseUrl}/whatsapp/1/message/template`, {
       method: "POST",
       headers: {
@@ -59,26 +77,17 @@ export async function sendVoterCredentials({
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({
-        messages: [
-          {
-            from,
-            to,
-            content: {
-              templateName,
-              templateData: {
-                body: {
-                  placeholders: [placeholder],
-                },
-              },
-              language: "en",
-            },
-          },
-        ],
-      }),
+      body: JSON.stringify(payload),
     });
-    return res.ok;
-  } catch {
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "(unreadable)");
+      console.error(`[Infobip] WhatsApp send failed — status ${res.status}:`, body);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("[Infobip] WhatsApp send error:", err);
     return false;
   }
 }
