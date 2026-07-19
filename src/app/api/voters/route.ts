@@ -196,7 +196,7 @@ export async function POST(req: Request) {
     throw err;
   }
 
-  if (phone) void sendVoterCredentials({ phone, name, voterId, password });
+  const whatsappSent = phone ? await sendVoterCredentials({ phone, name, voterId, password }) : false;
 
   const admin = await db.admin.findUnique({
     where: { id: guard.value.adminId },
@@ -224,6 +224,7 @@ export async function POST(req: Request) {
         registeredAt: created.registeredAt.toISOString(),
         password,
       },
+      whatsappSent,
     },
     { status: 201 },
   );

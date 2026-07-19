@@ -101,7 +101,7 @@ const formatDate = (iso: string): string =>
 type ModalView =
   | { kind: "closed" }
   | { kind: "form" }
-  | { kind: "success"; voter: VoterCredentials }
+  | { kind: "success"; voter: VoterCredentials; whatsappSent?: boolean; phoneUsed?: string }
   | { kind: "import" }
   | { kind: "import-results"; created: BulkImportRow[]; skipped: SkippedRow[] };
 
@@ -252,7 +252,7 @@ export default function VotersPage() {
       setErrors(next);
       return;
     }
-    const result = await apiCall<{ voter: VoterCredentials }>("/api/voters", {
+    const result = await apiCall<{ voter: VoterCredentials; whatsappSent: boolean }>("/api/voters", {
       method: "POST",
       body: JSON.stringify(form),
     });
@@ -261,7 +261,7 @@ export default function VotersPage() {
       return;
     }
     setErrors({});
-    setView({ kind: "success", voter: result.data.voter });
+    setView({ kind: "success", voter: result.data.voter, whatsappSent: result.data.whatsappSent, phoneUsed: form.phone });
     refresh(pageNum, filter.trim());
   };
 
@@ -614,7 +614,14 @@ export default function VotersPage() {
               <Row label="Password" value={view.voter.password} mono />
             </dl>
 
-            <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+            {view.phoneUsed && (
+              <p className={`mt-3 text-xs font-medium ${view.whatsappSent ? "text-success-600 dark:text-success-400" : "text-error-600 dark:text-error-400"}`}>
+                {view.whatsappSent
+                  ? `✓ WhatsApp message sent to ${view.phoneUsed}`
+                  : `⚠ WhatsApp send failed for ${view.phoneUsed} — use the button below to share manually`}
+              </p>
+            )}
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               The password is shown only this once. Share via WhatsApp or copy before closing.
             </p>
 
