@@ -196,7 +196,9 @@ export async function POST(req: Request) {
     throw err;
   }
 
+  console.log("[voters POST] phone value:", JSON.stringify(phone));
   const whatsappSent = phone ? await sendVoterCredentials({ phone, name, voterId, password }) : false;
+  console.log("[voters POST] whatsappSent:", whatsappSent);
 
   const admin = await db.admin.findUnique({
     where: { id: guard.value.adminId },
